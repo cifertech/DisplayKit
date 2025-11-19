@@ -1,9 +1,5 @@
 <div align="center">
 
-
-   
-
- 
 <!-- Badges -->
 
 <a href="https://github.com/cifertech/DisplayKit" title="Go to GitHub repo"><img src="https://img.shields.io/static/v1?label=cifertech&message=DisplayKit&color=cyan&logo=github" alt="cifertech - DisplayKit"></a>
