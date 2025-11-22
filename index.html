@@ -248,6 +248,163 @@
       padding: 4px 8px;
       font-size: 11px;
     }
+    /* دکمه‌های ابزار (Basic Shapes / UI Elements) به‌صورت چیپ آیکونی */
+    .chip-btn {
+      background: var(--bg-tertiary);
+      border-color: var(--border-color);
+      color: var(--text-primary);
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border-radius: 999px;
+      justify-content: center;
+    }
+    .chip-btn:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--border-color);
+      filter: brightness(1.08);
+    }
+    /* آیکن بدون دایره بیرونی (برای دکمه‌های کوچک مثل Delete / Apply / Add) */
+    .icon-btn-ghost {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border-color: transparent;
+      color: var(--text-secondary);
+    }
+    .icon-btn-ghost:hover {
+      background: rgba(248, 113, 113, 0.08);
+      border-color: rgba(248, 113, 113, 0.4);
+      color: #f97373;
+    }
+    .icon-btn-ghost svg {
+      width: 16px;
+      height: 16px;
+    }
+    /* Apply resolution button - بزرگ‌تر و وسطِ کارت Display */
+    #applyRes {
+      width: 40px;
+      height: 40px;
+      margin: 10px auto 0;
+      display: flex;
+    }
+    #applyRes svg {
+      width: 20px;
+      height: 20px;
+    }
+    /* Hover color variants */
+    #addScreenBtn:hover {
+      background: rgba(59, 130, 246, 0.12);
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+    #applyRes:hover {
+      background: rgba(34, 197, 94, 0.12);
+      border-color: #22c55e;
+      color: #22c55e;
+    }
+    /* Delete element button hover (پایین) قرمز به سبک بقیه */
+    #deleteElement:hover {
+      background: rgba(248, 113, 113, 0.12);
+      border-color: #f87171;
+      color: #f87171;
+    }
+    /* Clear all (screen) - وسط و بزرگ‌تر با هاور قرمز */
+    #clearAll {
+      display: block;
+      margin: 8px auto 0;
+      padding: 6px 14px;
+      font-size: 12px;
+      border-radius: 999px;
+    }
+    #clearAll:hover {
+      background: rgba(248, 113, 113, 0.12);
+      border-color: #f87171;
+      color: #f87171;
+    }
+    /* Toggle-style checkboxes */
+    .toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .toggle-input {
+      position: relative;
+      width: 36px;
+      height: 18px;
+      appearance: none;
+      -webkit-appearance: none;
+      background: #4b5563;
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+      transition: background 0.18s ease;
+    }
+    .toggle-input::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+      transition: transform 0.18s ease;
+    }
+    .toggle-input:checked {
+      background: #22c55e;
+    }
+    .toggle-input:checked::before {
+      transform: translateX(18px);
+    }
+    .icon-box {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 0;
+      font-size: 13px;
+      line-height: 1;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      transition: background-color 0.15s ease, border-color 0.15s ease,
+        color 0.15s ease, transform 0.1s ease;
+    }
+    .icon-box svg {
+      width: 18px;
+      height: 18px;
+    }
+    .icon-box.shape,
+    .icon-box.ui {
+      /* بدون رنگ آبی/بنفش؛ همه خنثی */
+      border-color: var(--border-color);
+    }
+    /* Hover برای آیکون‌های Basic Shapes و UI Elements */
+    .chip-btn:hover .icon-box.shape {
+      background: rgba(59, 130, 246, 0.10);
+      border-color: #3b82f6;
+      color: #e5e7eb;
+      transform: translateY(-1px);
+    }
+    .chip-btn:hover .icon-box.ui {
+      background: rgba(139, 92, 246, 0.10);
+      border-color: #8b5cf6;
+      color: #e5e7eb;
+      transform: translateY(-1px);
+    }
     #themeToggle {
       min-width: 32px;
       padding: 4px 8px;
@@ -405,6 +562,10 @@
     .prop-row > div {
       flex: 1;
     }
+    .prop-row.fn-row button {
+      align-self: flex-end;
+      margin-top: 2px; /* کمی پایین‌تر از قبل برای تراز بهتر با کادر */
+    }
     .code-panel {
       height: 32%;
       border-top: 1px solid var(--border-color);
@@ -429,11 +590,11 @@
     .pill {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
+      gap: 6px;
+      padding: 4px 10px;
       border-radius: 999px;
       background: var(--bg-tertiary);
-      font-size: 10px;
+      font-size: 11px;
       color: var(--text-secondary);
     }
     .pill.soft {
@@ -482,11 +643,11 @@
       background: var(--bg-secondary);
     }
     input[type="color"] {
-      border-radius: 999px;
+      border-radius: 6px;
       border: none;
       padding: 0;
-      width: 32px;
-      height: 18px;
+      width: 26px;
+      height: 26px;
       background: transparent;
     }
     .slider-inline {
@@ -606,7 +767,11 @@
           </select>
         </div>
       </div>
-      <button class="btn small" id="applyRes">Apply Resolution</button>
+      <button class="btn small secondary icon-btn-ghost" id="applyRes" title="Apply resolution">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="5,13 9,17 19,7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
     </div>
 
     <div class="section-title">Screens</div>
@@ -616,36 +781,137 @@
         <div>
           <select id="screenSelect"></select>
         </div>
-        <button class="btn small" id="addScreenBtn">+</button>
+        <button class="btn small secondary icon-btn-ghost" id="addScreenBtn" title="Add screen">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="12" y1="6" x2="12" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <line x1="6" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
       </div>
-      <div class="prop-row">
+      <div class="prop-row fn-row">
         <div>
           <label for="screenFnName">Function name</label>
           <input type="text" id="screenFnName" placeholder="drawHomeScreen" />
         </div>
-        <button class="btn small secondary" id="deleteScreenBtn">Del</button>
+        <button class="btn small secondary icon-btn-ghost" id="deleteScreenBtn" title="Delete screen">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="9,6 10,4 14,4 15,6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+            <rect x="7" y="6" width="10" height="12" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+            <line x1="10" y1="10" x2="10" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <line x1="14" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
       </div>
     </div>
 
-    <div class="section-title">Basic Shapes</div>
-    <div class="btn-group">
-      <button class="btn small" data-add="rect">Rect</button>
-      <button class="btn small" data-add="roundrect">Round Rect</button>
-      <button class="btn small" data-add="circle">Circle</button>
-      <button class="btn small" data-add="line">Line</button>
-      <button class="btn small" data-add="divider">Divider</button>
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">Basic Shapes</div>
+      <div class="btn-group">
+        <button class="btn small chip-btn" data-add="rect" title="Rect">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="7" width="14" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="roundrect" title="Round Rect">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="7" width="14" height="10" rx="5" ry="5" stroke="currentColor" stroke-width="2" fill="none" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="circle" title="Circle">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="2" fill="none" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="line" title="Line">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="5" y1="18" x2="19" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="divider" title="Divider">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </span>
+        </button>
+      </div>
     </div>
 
-    <div class="section-title">UI Elements</div>
-    <div class="btn-group">
-      <button class="btn small" data-add="label">Label</button>
-      <button class="btn small" data-add="button">Button</button>
-      <button class="btn small" data-add="progress">Progress</button>
-      <button class="btn small" data-add="slider">Slider</button>
-      <button class="btn small" data-add="toggle">Toggle</button>
-      <button class="btn small" data-add="card">Card</button>
-      <button class="btn small" data-add="header">Header</button>
-      <button class="btn small" id="addImageBtn">Image</button>
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">UI Elements</div>
+      <div class="btn-group">
+        <button class="btn small chip-btn" data-add="label" title="Label">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="7" width="14" height="10" rx="3" ry="3" stroke="currentColor" stroke-width="2" fill="none" />
+              <line x1="8" y1="11" x2="16" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="button" title="Button">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="6" y="9" width="12" height="6" rx="3" ry="3" stroke="currentColor" stroke-width="2" fill="none" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="progress" title="Progress">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="10" width="14" height="4" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+              <rect x="6" y="11" width="7" height="2" rx="1" ry="1" fill="currentColor" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="slider" title="Slider">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="6" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <circle cx="10" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="var(--bg-tertiary)" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="toggle" title="Toggle">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="9" width="14" height="6" rx="3" ry="3" stroke="currentColor" stroke-width="2" fill="none" />
+              <circle cx="15" cy="12" r="2.5" stroke="currentColor" stroke-width="2" fill="var(--bg-tertiary)" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="card" title="Card">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="7" width="14" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+              <line x1="7" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" data-add="header" title="Header">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="7" width="14" height="4" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+            </svg>
+          </span>
+        </button>
+        <button class="btn small chip-btn" id="addImageBtn" title="Image">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="6" width="16" height="12" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+              <circle cx="10" cy="11" r="1.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+              <polyline points="7,16 11,12 16,16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+        </button>
+      </div>
     </div>
 
     <div class="section-title">Scene</div>
@@ -661,8 +927,8 @@
 
     <div class="section-title">Grid & Snap</div>
     <div class="prop-group">
-      <label>
-        <input type="checkbox" id="snapCheckbox" />
+      <label class="toggle-label">
+        <input type="checkbox" id="snapCheckbox" class="toggle-input" />
         Snap to grid
       </label>
       <div class="prop-row">
@@ -674,8 +940,8 @@
     </div>
 
     <div class="prop-group">
-      <label>
-        <input type="checkbox" id="useSpriteCheckbox" />
+      <label class="toggle-label">
+        <input type="checkbox" id="useSpriteCheckbox" class="toggle-input" />
         Use sprite (TFT_eSprite) for screens
       </label>
     </div>
@@ -822,9 +1088,14 @@
             </div>
           </div>
 
-          <div class="prop-group">
-            <button class="btn secondary small" id="deleteElement">
-              Delete element
+          <div class="prop-group" style="display: flex; justify-content: flex-end;">
+            <button class="btn secondary small icon-btn-ghost" id="deleteElement" title="Delete element">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="9,6 10,4 14,4 15,6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                <rect x="7" y="6" width="10" height="12" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+                <line x1="10" y1="10" x2="10" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <line x1="14" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
             </button>
           </div>
         </div>
