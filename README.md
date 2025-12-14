@@ -26,9 +26,9 @@
 
 Design screens visually → generate clean **Arduino** drawing code → run it on boards like **ESP32 / ESP8266 / STM32 / Arduino / RP2040** (and more).
 
-## Quick start (recommended)
+## Quick start
 
-- **Use it online (recommended)**: click the GitHub Pages link in the repository, or open: `https://cifertech.github.io/DisplayKit/`
+- **Use it online**: click the GitHub Pages link in the repository, or open: `https://cifertech.github.io/DisplayKit/`
 
 
 ## How to use
