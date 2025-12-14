@@ -61,56 +61,53 @@ DisplayKit includes tool pages under `tools/` and can open them inside the app o
 
 ## 🚀 Features
 
-### 🖥 Multi-Screen UI Builder
-- Create unlimited screens (Home, Settings, About…)
-- Auto-generates `drawScreenName()` functions
-- Visual screen switching system
+### 🖥 Multi-screen UI builder
+- Create **multiple screens** and switch between them
+- Auto-generates a draw function per screen (e.g. `drawHomeScreen()`)
+- Per-screen element lists (clear/reset a single screen without touching others)
 
-### 🧱 Drag-and-Drop Elements
-- Rect, RoundRect, Circle
-- Labels, Buttons, Headers
-- Cards, Dividers
-- Progress Bars, Sliders, Toggles
-- Images (PNG/JPG → RGB565 or monochrome)
+### 🖥 Display driver modes
+- **TFT_eSPI mode**: full-color UI preview + Arduino code generation
+- **U8g2 OLED mode**: OLED-style preview + U8g2 code generation
+- Built-in display settings:
+  - **TFT**: rotation (plus UI options for color depth / backlight / touch metadata)
+  - **OLED**: preset constructors (I2C/SPI), rotation, contrast, flip mode, font mode, power save
 
-### 🖼 Image Engine
-- Upload PNG/JPG
-- Auto-converts to **RGB565** for TFT_eSPI
-- Auto-converts to **monochrome bitmap** for U8g2
-- Stores as PROGMEM arrays
-- Real preview inside editor
+### 🧱 Drag-and-drop elements
+- Shapes: Rect, RoundRect, Circle, Line, Divider
+- UI: Label, Button, Header, Card
+- Controls: Progress, Slider, Toggle
+- Images:
+  - Import PNG/JPG into the canvas (stored internally as RGB565 for TFT workflows)
+  - Preview images inside the editor
 
-### 🔠 Full Font Support
+### 🧰 Editor workflow & productivity
+- Undo / Redo history
+- Duplicate elements
+- Resize handles (most elements) + drag to position
+- Snap-to-grid + configurable grid size
+- Zoom (50–200%)
+- Background presets + custom background color
+- JSON project **Export / Import**
+
+### 🧩 Built-in tools (inside the app)
+- PixelForge (image converter) and BitCanvas Studio (animation) can open in an in-app overlay
+- Theme sync between DisplayKit and embedded tools (light/dark)
+
+### ⚙ Code output
 #### TFT_eSPI
-- Text size control
-- Text color, stroke, fill
+- Generates: `fillRect`, `fillRoundRect` / `drawRoundRect`, `fillCircle`, `drawLine`, text primitives, etc.
+- Optional **TFT_eSprite** rendering (`Use sprite` toggle)
+- RGB565 image arrays in **PROGMEM** + `pushImage()`
 
 #### U8g2
-- Complete font selector (hundreds of fonts)
-- Auto-generates correct `u8g2.setFont()` code
+- Generates: `drawBox`, `drawRBox` / frames, `drawDisc` / circles, `drawLine`, etc.
+- Font selection per text element + emits `u8g2.setFont(...)`
+- Note: **image elements are currently not emitted** in the U8g2 sample code output
 
-### 🧰 Editor Tools
-- Undo / Redo
-- Duplicate element
-- Align (Left, Right, Center, Top…)
-- Snap-to-grid
-- Zoom 50–200%
-- JSON project import/export
-
-### ⚙ Code Output
-#### TFT_eSPI Mode:
-- `fillRect`, `drawRoundRect`, `drawString`
-- `pushImage()` for bitmaps
-- Optional **TFT_eSprite** rendering
-
-#### U8g2 Mode:
-- `drawBox`, `drawRBox`, `drawDisc`
-- Monochrome bitmaps
-- Full font rendering
-
-### 🔌 Actions & Navigation
-- Buttons can “Go to Screen”
-- Generates logic-ready comments for touch input
+### 🔌 Actions & navigation hooks
+- Elements can be assigned an “On click → Go to screen…” action in the editor
+- Code output keeps drawing code focused; touch/click wiring is left for you to implement in your input loop
 
 &nbsp;
 
@@ -134,10 +131,6 @@ DisplayKit includes tool pages under `tools/` and can open them inside the app o
    ├─ bitcanvas-studio/ # Animation tool
    └─ theme.css         # Shared theme tokens for tool pages
 ```
-
-## License
-
-See `LICENSE`.
 
 &nbsp;
 
