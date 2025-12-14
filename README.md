@@ -132,8 +132,6 @@ DisplayKit includes tool pages under `tools/` and can open them inside the app o
    └─ theme.css         # Shared theme tokens for tool pages
 ```
 
-&nbsp;
-
 ## 🤝 Contribute
 
 Want to help make DisplayKit better?
