@@ -15,6 +15,22 @@ let gridSize = 4;
 
 
 let driverMode = "tft";
+
+// Display settings state
+let tftSettingsState = {
+  rotation: 0,
+  colorDepth: 16,
+  backlight: "none",
+  touch: "none"
+};
+
+let oledSettingsState = {
+  rotation: 0,
+  contrast: 127,
+  flipMode: "none",
+  fontMode: "transparent",
+  powerSave: "off"
+};
 let u8g2PresetId = "ssd1306_128x64_i2c_f";
 
 const DEFAULT_U8G2_FONT = "u8g2_font_6x10_tf";
@@ -38,6 +54,22 @@ const snapCheckbox = document.getElementById("snapCheckbox");
 const gridSizeInput = document.getElementById("gridSize");
 
 const displayDriverSelect = document.getElementById("displayDriver");
+const tftSettings = document.getElementById("tftSettings");
+const oledSettings = document.getElementById("oledSettings");
+
+// TFT settings elements
+const tftRotation = document.getElementById("tftRotation");
+const tftColorDepth = document.getElementById("tftColorDepth");
+const tftBacklight = document.getElementById("tftBacklight");
+const tftTouch = document.getElementById("tftTouch");
+
+// OLED settings elements
+const oledRotation = document.getElementById("oledRotation");
+const oledContrast = document.getElementById("oledContrast");
+const oledContrastValue = document.getElementById("oledContrastValue");
+const oledFlipMode = document.getElementById("oledFlipMode");
+const oledFontMode = document.getElementById("oledFontMode");
+const oledPowerSave = document.getElementById("oledPowerSave");
 const u8g2PresetSelect = document.getElementById("u8g2Preset");
 
 const addButtons = document.querySelectorAll("[data-add]");
@@ -101,6 +133,359 @@ const importJsonInput = document.getElementById("importJsonInput");
 const bgColorChips = document.querySelectorAll("[data-bg-color]");
 const bgColorCustomBtn = document.getElementById("bgColorCustom");
 
+// Embedded tools overlay (PixelForge / BitCanvas Studio)
+const toolOverlay = document.getElementById("toolOverlay");
+const toolOverlayPill = document.getElementById("toolOverlayPill");
+const toolOverlayName = document.getElementById("toolOverlayName");
+const toolOverlayClose = document.getElementById("toolOverlayClose");
+const toolOverlayAction = document.getElementById("toolOverlayAction");
+const toolOverlayOpenNewTab = document.getElementById("toolOverlayOpenNewTab");
+const toolFramePixelForge = document.getElementById("toolFrame_pixelforge");
+const toolFrameBitCanvas = document.getElementById("toolFrame_bitcanvas");
+const toolSwitchButtons = document.querySelectorAll("[data-switch-tool]");
+
+const EMBEDDED_TOOLS = {
+  pixelforge: {
+    label: "PixelForge (Image Converter)",
+    href: "tools/pixelforge/index.html"
+  },
+  bitcanvas: {
+    label: "BitCanvas Studio (Animation)",
+    href: "tools/bitcanvas-studio/index.html"
+  }
+};
+
+let activeEmbeddedToolKey = null;
+let pendingToolAction = null; // "importImage" | "copyExport" | null
+const loadedToolFrames = new Set(); // toolKey strings
+
+function getToolFrameEl(toolKey) {
+  if (toolKey === "pixelforge") return toolFramePixelForge;
+  if (toolKey === "bitcanvas") return toolFrameBitCanvas;
+  return null;
+}
+
+function hideAllToolFrames() {
+  [toolFramePixelForge, toolFrameBitCanvas].forEach((f) => {
+    if (f) f.classList.add("hidden");
+  });
+}
+
+function setActiveToolSwitchUI(toolKey) {
+  toolSwitchButtons.forEach((btn) => {
+    const key = btn.getAttribute("data-switch-tool");
+    const active = key === toolKey;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
+  });
+}
+
+function refreshEmbeddedToolHrefs() {
+  // Make right-click "Open in new tab" (and the overlay button) open the *embedded* themed variant.
+  document.querySelectorAll("[data-open-tool]").forEach((el) => {
+    const key = el.getAttribute("data-open-tool");
+    const tool = EMBEDDED_TOOLS[key];
+    if (!tool) return;
+    el.setAttribute("href", buildEmbeddedToolUrl(tool.href));
+  });
+
+  if (toolOverlayOpenNewTab && activeEmbeddedToolKey && EMBEDDED_TOOLS[activeEmbeddedToolKey]) {
+    toolOverlayOpenNewTab.href = buildEmbeddedToolUrl(EMBEDDED_TOOLS[activeEmbeddedToolKey].href);
+  }
+}
+
+function getCurrentDisplayKitTheme() {
+  return document.documentElement.getAttribute("data-theme")
+    || localStorage.getItem("theme")
+    || "dark";
+}
+
+function buildEmbeddedToolUrl(baseHref) {
+  const theme = getCurrentDisplayKitTheme();
+  try {
+    const u = new URL(baseHref, window.location.href);
+    u.searchParams.set("embed", "1");
+    u.searchParams.set("theme", theme);
+    return u.toString();
+  } catch {
+    // Fallback for edge cases: still try to pass params
+    const join = baseHref.includes("?") ? "&" : "?";
+    return `${baseHref}${join}embed=1&theme=${encodeURIComponent(theme)}`;
+  }
+}
+
+function syncEmbeddedToolTheme(theme) {
+  if (!toolOverlay) return;
+  // Sync to any loaded frames; this keeps them consistent even while hidden.
+  const frames = [toolFramePixelForge, toolFrameBitCanvas].filter(Boolean);
+  frames.forEach((frame) => {
+    try {
+      frame.contentWindow?.postMessage({ type: "displaykitTheme", theme }, "*");
+    } catch {
+      // ignore
+    }
+  });
+}
+
+function requestToolExport(toolKey) {
+  const frame = getToolFrameEl(toolKey);
+  if (!frame?.contentWindow) return;
+  try {
+    frame.contentWindow.postMessage({ type: "requestExport", tool: toolKey }, "*");
+  } catch {
+    // ignore
+  }
+}
+
+function setToolOverlayAction(toolKey) {
+  activeEmbeddedToolKey = toolKey;
+  pendingToolAction = null;
+  if (!toolOverlayAction) return;
+
+  if (toolKey === "pixelforge") {
+    toolOverlayAction.style.display = "inline-flex";
+    toolOverlayAction.textContent = "Import image to DisplayKit";
+    pendingToolAction = "importImage";
+  } else if (toolKey === "bitcanvas") {
+    toolOverlayAction.style.display = "inline-flex";
+    toolOverlayAction.textContent = "Copy export to clipboard";
+    pendingToolAction = "copyExport";
+  } else {
+    toolOverlayAction.style.display = "none";
+    toolOverlayAction.textContent = "Action";
+  }
+}
+
+function parsePixelForgeHeaderToRgb565(text) {
+  if (!text || typeof text !== "string") {
+    throw new Error("No export text received from PixelForge. Click Convert first.");
+  }
+
+  const widthMatch = text.match(/const\s+uint16_t\s+([A-Za-z0-9_]+)_width\s*=\s*(\d+)\s*;/);
+  const heightMatch = text.match(/const\s+uint16_t\s+([A-Za-z0-9_]+)_height\s*=\s*(\d+)\s*;/);
+  if (!widthMatch || !heightMatch) {
+    throw new Error("Couldn't find width/height in PixelForge export.");
+  }
+
+  const baseName = widthMatch[1];
+  const w = parseInt(widthMatch[2], 10);
+  const h = parseInt(heightMatch[2], 10);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    throw new Error("Invalid width/height in PixelForge export.");
+  }
+
+  // Prefer the base symbol if present; otherwise take the first uint16_t PROGMEM array.
+  const preferredRe = new RegExp(
+    `const\\s+uint16_t\\s+(${baseName}(?:_\\d+)?)\\s*\\[\\]\\s*PROGMEM\\s*=\\s*\\{([\\s\\S]*?)\\};`
+  );
+  let arrayMatch = text.match(preferredRe);
+  if (!arrayMatch) {
+    arrayMatch = text.match(/const\s+uint16_t\s+([A-Za-z0-9_]+)\s*\[\]\s*PROGMEM\s*=\s*\{([\s\S]*?)\};/);
+  }
+  if (!arrayMatch) {
+    throw new Error("Couldn't find a uint16_t RGB565 array in PixelForge export (TFT mode only).");
+  }
+
+  const symbol = arrayMatch[1];
+  const body = arrayMatch[2];
+  const hexes = body.match(/0x[0-9A-Fa-f]{1,4}/g) || [];
+  if (!hexes.length) {
+    throw new Error("No pixel data found in PixelForge export.");
+  }
+  const rgb565 = hexes.map((hx) => parseInt(hx, 16) & 0xffff);
+
+  return { symbol, baseName, w, h, rgb565 };
+}
+
+function rgb565ToDataUrl(w, h, rgb565) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+
+  const total = Math.min(rgb565.length, w * h);
+  for (let p = 0; p < total; p++) {
+    const v = rgb565[p] & 0xffff;
+    const r5 = (v >> 11) & 0x1f;
+    const g6 = (v >> 5) & 0x3f;
+    const b5 = v & 0x1f;
+    const r = (r5 << 3) | (r5 >> 2);
+    const g = (g6 << 2) | (g6 >> 4);
+    const b = (b5 << 3) | (b5 >> 2);
+    const i = p * 4;
+    d[i] = r;
+    d[i + 1] = g;
+    d[i + 2] = b;
+    d[i + 3] = 255;
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+function importRgb565ImageToDisplayKit({ symbol, w, h, rgb565 }) {
+  if (!Array.isArray(rgb565) || !rgb565.length) {
+    throw new Error("No RGB565 data to import.");
+  }
+
+  const id = makeId();
+  const x = Math.max(0, Math.round((dispWidth - w) / 2));
+  const y = Math.max(0, Math.round((dispHeight - h) / 2));
+  const previewUrl = rgb565ToDataUrl(w, h, rgb565);
+
+  const el = {
+    id,
+    type: "image",
+    x,
+    y,
+    w,
+    h,
+    text: "",
+    textSize: 2,
+    fillColor: "#ffffff",
+    strokeColor: "#ffffff",
+    textColor: "#000000",
+    value: 0,
+    imageName: symbol || ("img_" + id.replace(/[^a-zA-Z0-9_]/g, "_")),
+    imageWidth: w,
+    imageHeight: h,
+    rgb565,
+    previewUrl,
+    font: DEFAULT_U8G2_FONT
+  };
+
+  elements.push(el);
+  selectedId = id;
+  updatePreviewSize();
+  renderElements();
+  updatePropsInputs();
+  updateCode();
+  pushHistory();
+}
+
+function openEmbeddedTool(toolKey) {
+  if (!toolOverlay) return;
+  const tool = EMBEDDED_TOOLS[toolKey];
+  if (!tool) return;
+  const embeddedUrl = buildEmbeddedToolUrl(tool.href);
+  const frame = getToolFrameEl(toolKey);
+  if (!frame) return;
+
+  // Update header UI
+  if (toolOverlayPill) toolOverlayPill.textContent = "Tools";
+  if (toolOverlayOpenNewTab) toolOverlayOpenNewTab.href = embeddedUrl;
+  frame.title = tool.label;
+
+  // Keep tool state by loading each tool once and then only toggling visibility
+  if (!loadedToolFrames.has(toolKey)) {
+    frame.setAttribute("src", embeddedUrl);
+    loadedToolFrames.add(toolKey);
+  }
+
+  toolOverlay.classList.add("open");
+  toolOverlay.setAttribute("aria-hidden", "false");
+  document.documentElement.classList.add("tool-open");
+  setToolOverlayAction(toolKey);
+  setActiveToolSwitchUI(toolKey);
+
+  hideAllToolFrames();
+  frame.classList.remove("hidden");
+
+  // Ensure theme is synced even if the tool doesn't read query params
+  syncEmbeddedToolTheme(getCurrentDisplayKitTheme());
+}
+
+function closeEmbeddedTool() {
+  if (!toolOverlay) return;
+  toolOverlay.classList.remove("open");
+  toolOverlay.setAttribute("aria-hidden", "true");
+  document.documentElement.classList.remove("tool-open");
+  setToolOverlayAction(null);
+  setActiveToolSwitchUI(null);
+}
+
+// Intercept tool links and open inside the app overlay
+document.querySelectorAll("[data-open-tool]").forEach((el) => {
+  el.addEventListener("click", (e) => {
+    e.preventDefault();
+    const key = el.getAttribute("data-open-tool");
+    openEmbeddedTool(key);
+  });
+});
+
+// Tool switcher tabs inside overlay
+toolSwitchButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.getAttribute("data-switch-tool");
+    openEmbeddedTool(key);
+  });
+});
+
+// Ensure the default hrefs also point at the embedded/themed URLs
+refreshEmbeddedToolHrefs();
+
+if (toolOverlayClose) {
+  toolOverlayClose.addEventListener("click", closeEmbeddedTool);
+}
+
+if (toolOverlayAction) {
+  toolOverlayAction.addEventListener("click", () => {
+    if (!activeEmbeddedToolKey || !pendingToolAction) return;
+    requestToolExport(activeEmbeddedToolKey);
+  });
+}
+
+// Click outside the inner panel closes the overlay
+if (toolOverlay) {
+  toolOverlay.addEventListener("mousedown", (e) => {
+    if (e.target === toolOverlay) {
+      closeEmbeddedTool();
+    }
+  });
+}
+
+if (toolFramePixelForge) {
+  toolFramePixelForge.addEventListener("load", () => {
+    syncEmbeddedToolTheme(getCurrentDisplayKitTheme());
+  });
+}
+if (toolFrameBitCanvas) {
+  toolFrameBitCanvas.addEventListener("load", () => {
+    syncEmbeddedToolTheme(getCurrentDisplayKitTheme());
+  });
+}
+
+// Receive exports from embedded tools
+window.addEventListener("message", async (event) => {
+  const data = event && event.data;
+  if (!data || data.type !== "toolExport") return;
+  const tool = data.tool;
+
+  try {
+    if (tool === "pixelforge") {
+      const parsed = parsePixelForgeHeaderToRgb565(data.text || "");
+      importRgb565ImageToDisplayKit(parsed);
+      alert("Imported image into current screen.");
+    } else if (tool === "bitcanvas") {
+      const text = data.text || "";
+      if (!text.trim()) throw new Error("No export text found. Click an Export button in BitCanvas first.");
+      await navigator.clipboard.writeText(text);
+      alert("Copied BitCanvas export to clipboard.");
+    }
+  } catch (err) {
+    alert(err && err.message ? err.message : "Tool export failed.");
+  }
+});
+
+// ESC closes the overlay
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && toolOverlay && toolOverlay.classList.contains("open")) {
+    closeEmbeddedTool();
+  }
+});
+
 
 function getTheme() {
   const saved = localStorage.getItem("theme");
@@ -114,6 +499,8 @@ function setTheme(theme) {
   if (themeIcon) {
     themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
   }
+  syncEmbeddedToolTheme(theme);
+  refreshEmbeddedToolHrefs();
 }
 
 function toggleTheme() {
@@ -211,7 +598,10 @@ function deepCloneState() {
       snapToGrid,
       gridSize,
       driverMode,
-      u8g2PresetId
+      u8g2PresetId,
+      tftSettingsState,
+      oledSettingsState,
+      // Element transparency is handled per element, no global state needed
     })
   );
 }
@@ -228,6 +618,19 @@ function applyStateSnapshot(snap) {
   gridSize = snap.gridSize || 4;
   driverMode = snap.driverMode || "tft";
   u8g2PresetId = snap.u8g2PresetId || "ssd1306_128x64_i2c_f";
+  tftSettingsState = snap.tftSettingsState || {
+    rotation: 0,
+    colorDepth: 16,
+    backlight: "none",
+    touch: "none"
+  };
+  oledSettingsState = snap.oledSettingsState || {
+    rotation: 0,
+    contrast: 127,
+    flipMode: "none",
+    fontMode: "transparent",
+    powerSave: "off"
+  };
 
   dispWidthInput.value = dispWidth;
   dispHeightInput.value = dispHeight;
@@ -244,6 +647,7 @@ function applyStateSnapshot(snap) {
   } else if (screens[0]) {
     setActiveScreen(screens[0].id, false);
   }
+  updateDisplaySettingsVisibility();
   updatePreviewSize();
   renderElements();
   updatePropsInputs();
@@ -263,6 +667,41 @@ function pushHistory() {
 function updateUndoRedoButtons() {
   undoBtn.disabled = historyIndex <= 0;
   redoBtn.disabled = historyIndex >= history.length - 1;
+}
+
+function hexToRgb(hex) {
+  // Remove # if present
+  hex = hex.replace(/^#/, '');
+
+  // Parse the hex value
+  let r, g, b;
+  if (hex.length === 3) {
+    // Short format (#RGB)
+    r = parseInt(hex.charAt(0) + hex.charAt(0), 16);
+    g = parseInt(hex.charAt(1) + hex.charAt(1), 16);
+    b = parseInt(hex.charAt(2) + hex.charAt(2), 16);
+  } else if (hex.length === 6) {
+    // Long format (#RRGGBB)
+    r = parseInt(hex.substr(0, 2), 16);
+    g = parseInt(hex.substr(2, 2), 16);
+    b = parseInt(hex.substr(4, 2), 16);
+  } else {
+    return null; // Invalid format
+  }
+
+  return { r, g, b };
+}
+
+function isLightColor(hex) {
+  const rgb = hexToRgb(hex || "#000000");
+  if (!rgb) return false;
+  // Perceived luminance (0..1)
+  const lum = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  return lum > 0.62;
+}
+
+function getContrastingColor(hex) {
+  return isLightColor(hex) ? "#111827" : "#FFFFFF";
 }
 
 function hexToRgb565(hex) {
@@ -291,6 +730,10 @@ function elementHasText(type) {
 
 function elementHasValue(type) {
   return ["progress", "slider", "toggle"].includes(type);
+}
+
+function elementHasFill(type) {
+  return ["rect", "roundrect", "circle", "button", "card", "header", "progress", "slider", "toggle"].includes(type);
 }
 
 function elementSupportsAction(type) {
@@ -402,21 +845,92 @@ function updatePreviewSize() {
   preview.style.height = dispHeight * scale + "px";
   preview.style.backgroundColor = bgColor;
 
+  // OLED mode: show individual pixels
+  if (driverMode === "u8g2") {
+    preview.classList.add('oled-display');
+    // For OLED, use nearest neighbor scaling to show pixels clearly
+    preview.style.imageRendering = 'pixelated';
+    preview.style.imageRendering = '-moz-crisp-edges';
+    preview.style.imageRendering = 'crisp-edges';
+
+    // Set pixel grid size based on scale (each display pixel = 1 physical pixel at 1:1 scale)
+    const pixelSize = Math.max(1, scale);
+    preview.style.setProperty('--pixel-size', pixelSize + 'px');
+  } else {
+    preview.classList.remove('oled-display');
+    preview.style.imageRendering = 'auto';
+    preview.style.removeProperty('--pixel-size');
+  }
+
   preview.dataset.scale = scale;
   const driverLabel = driverMode === "u8g2" ? "U8g2 OLED" : "TFT_eSPI";
   displayInfo.textContent = `${driverLabel} · ${dispWidth}x${dispHeight} px`;
 }
 
 
+function convertToOLEDColor(color) {
+  if (!color || color === "transparent") return "#000000";
+
+  // For OLED displays, convert to cyan shades for consistency with cyan theme
+  // Check if color is already a hex color
+  if (color.startsWith('#')) {
+    // Convert to grayscale then to cyan shades
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+
+    // Calculate luminance (brightness)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+    if (luminance < 0.1) return "#002244"; // Very dark cyan
+    if (luminance < 0.2) return "#004466"; // Dark cyan
+    if (luminance < 0.3) return "#006688"; // Medium-dark cyan
+    if (luminance < 0.4) return "#0088aa"; // Medium cyan
+    if (luminance < 0.5) return "#00aacc"; // Light medium cyan
+    if (luminance < 0.6) return "#00ccee"; // Light cyan
+    if (luminance < 0.7) return "#22ddff"; // Bright cyan
+    if (luminance < 0.8) return "#44eeff"; // Very bright cyan
+    if (luminance < 0.9) return "#66ffff"; // Maximum cyan
+    return "#88ffff"; // Ultra bright cyan
+  }
+
+  // Handle named colors with OLED-appropriate cyan shades
+  const colorMap = {
+    "white": "#88ffff",  // Bright cyan
+    "black": "#002244",  // Dark cyan
+    "gray": "#006688",   // Medium cyan
+    "grey": "#006688",
+    "red": "#0088aa",    // Medium cyan
+    "green": "#00ccee",  // Light cyan
+    "blue": "#44eeff",   // Bright cyan
+    "yellow": "#66ffff", // Very bright cyan
+    "orange": "#22ddff", // Bright cyan
+    "purple": "#00aacc", // Light medium cyan
+    "pink": "#44eeff",   // Bright cyan
+    "cyan": "#88ffff",   // Ultra bright cyan (keeps cyan bright)
+    "magenta": "#22ddff", // Bright cyan
+    "brown": "#004466",  // Dark cyan
+    "navy": "#002244",   // Very dark cyan
+    "maroon": "#004466", // Dark cyan
+    "olive": "#006688"   // Medium cyan
+  };
+
+  return colorMap[color.toLowerCase()] || "#0088aa";
+}
+
 function renderElements() {
   const scale = parseFloat(preview.dataset.scale || "1");
   preview.innerHTML = "";
   preview.style.position = "relative";
 
+  const isOLED = driverMode === "u8g2";
+
   elements.forEach((el) => {
     const div = document.createElement("div");
-    div.className = "ui-element" + (el.id === selectedId ? " selected" : "");
+    div.className = "ui-element" + (el.id === selectedId ? " selected" : "") + (isOLED ? " oled-element" : "");
     div.dataset.id = el.id;
+    div.setAttribute("type", el.type); // Add type attribute for CSS targeting
 
     const x = el.x * scale;
     const y = el.y * scale;
@@ -428,9 +942,43 @@ function renderElements() {
     div.style.width = w + "px";
     div.style.height = h + "px";
 
-    const fill = el.fillColor || "#ffffff";
-    const stroke = el.strokeColor || "#ffffff";
-    const textColor = el.textColor || "#000000";
+    let fill = el.fillColor || "#ffffff";
+    let stroke = el.strokeColor || "#ffffff";
+    let textColor = el.textColor || "#000000";
+    let shouldFill = true;
+
+    if (isOLED) {
+      // OLED mode: use binary fill control
+      shouldFill = el.oledFill !== false; // Default to true for OLED
+      if (!shouldFill) {
+        fill = "transparent";
+        stroke = convertToOLEDColor(stroke);
+        textColor = convertToOLEDColor(textColor);
+      } else {
+        // OLED displays are typically monochromatic
+        fill = convertToOLEDColor(fill);
+        stroke = convertToOLEDColor(stroke);
+        textColor = convertToOLEDColor(textColor);
+      }
+
+      // Add crisp pixel rendering
+      div.style.imageRendering = 'pixelated';
+      div.style.imageRendering = '-moz-crisp-edges';
+      div.style.imageRendering = 'crisp-edges';
+    } else {
+      // TFT mode: use alpha transparency
+      let fillAlpha = el.fillAlpha != null ? el.fillAlpha : 255;
+      shouldFill = fillAlpha > 0;
+
+      // Apply alpha to fill color if not fully opaque
+      if (fillAlpha < 255) {
+        // Convert hex to RGB for alpha support
+        const rgb = hexToRgb(fill);
+        if (rgb) {
+          fill = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${fillAlpha / 255})`;
+        }
+      }
+    }
 
     if (el.type === "image") {
       div.style.backgroundImage = el.previewUrl ? `url(${el.previewUrl})` : "none";
@@ -441,10 +989,18 @@ function renderElements() {
       div.style.backgroundColor = "#000000";
       div.style.borderRadius = "4px";
     } else if (el.type === "circle") {
-      div.style.borderRadius = "50%";
-      div.style.backgroundColor = fill;
+      if (shouldFill) {
+        div.style.borderRadius = "50%";
+        div.style.backgroundColor = fill;
+        div.style.boxShadow = `0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)`;
+      } else {
+        // In OLED mode, unfilled circles become rectangles for simplicity
+        div.style.borderRadius = "2px";
+        div.style.backgroundColor = "transparent";
+        div.style.background = "none";
+        div.style.boxShadow = `0 1px 2px rgba(0, 0, 0, 0.2)`;
+      }
       div.style.border = "1px solid " + stroke;
-      div.style.boxShadow = `0 3px 6px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.2)`;
     } else if (el.type === "line") {
       
       const angle = Math.atan2(h, w) * (180 / Math.PI);
@@ -456,13 +1012,14 @@ function renderElements() {
       div.style.transform = `rotate(${angle}deg)`;
       div.style.boxShadow = `0 1px 2px rgba(0, 0, 0, 0.2)`;
     } else if (el.type === "divider") {
+      // Keep dividers crisp + always visible (avoid fragile background gradients)
       div.style.height = Math.max(2, h) + "px";
       div.style.width = w + "px";
       div.style.backgroundColor = stroke;
       div.style.borderRadius = "1px";
       div.style.boxShadow = `0 1px 2px rgba(0, 0, 0, 0.2)`;
-      
-      div.style.background = `linear-gradient(to bottom, ${stroke}, ${stroke}dd)`;
+      // NOTE: don't set `background` here; it can override backgroundColor and
+      // become invalid depending on browser support (making the divider disappear).
     } else if (el.type === "progress") {
       div.style.backgroundColor = "rgba(0, 0, 0, 0.3)";
       div.style.border = "1px solid " + stroke;
@@ -530,7 +1087,11 @@ function renderElements() {
       knob.style.left = on ? (w - h + 2) + "px" : "2px";
       div.appendChild(knob);
     } else if (el.type === "header") {
-      div.style.backgroundColor = fill;
+      if (shouldFill) {
+        div.style.backgroundColor = fill;
+      } else {
+        div.style.backgroundColor = "transparent";
+      }
       div.style.borderBottom = "2px solid " + stroke;
       div.style.alignItems = "center";
       div.style.justifyContent = "flex-start";
@@ -540,35 +1101,57 @@ function renderElements() {
       div.style.textShadow = "0 1px 2px rgba(0, 0, 0, 0.1)";
       div.textContent = el.text || "Header";
     } else if (el.type === "card") {
-      div.style.backgroundColor = fill;
+      if (shouldFill) {
+        div.style.backgroundColor = fill;
+        div.style.boxShadow = `0 2px 4px rgba(0, 0, 0, 0.2)`;
+      } else {
+        div.style.backgroundColor = "transparent";
+        div.style.boxShadow = `0 1px 2px rgba(0, 0, 0, 0.2)`;
+      }
       div.style.borderRadius = "8px";
       div.style.border = "1px solid " + stroke;
       div.style.padding = Math.max(6, 4 * scale) + "px";
       div.style.color = textColor;
       div.style.alignItems = "flex-start";
       div.style.justifyContent = "flex-start";
-      div.style.boxShadow = `0 2px 4px rgba(0, 0, 0, 0.2)`;
       div.textContent = el.text || "Card";
     } else if (el.type === "rect") {
-      
-      div.style.backgroundColor = fill;
+      if (shouldFill) {
+        div.style.backgroundColor = fill;
+        div.style.boxShadow = `0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)`;
+      } else {
+        div.style.backgroundColor = "transparent";
+        div.style.background = "none";
+        div.style.boxShadow = `0 1px 2px rgba(0, 0, 0, 0.2)`;
+      }
       div.style.border = "1px solid " + stroke;
       div.style.borderRadius = "2px";
-      div.style.boxShadow = `0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)`;
     } else if (el.type === "roundrect") {
-      
-      div.style.backgroundColor = fill;
+      if (shouldFill) {
+        div.style.backgroundColor = fill;
+        div.style.boxShadow = `0 3px 6px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.15)`;
+      } else {
+        div.style.backgroundColor = "transparent";
+        div.style.background = "none";
+        div.style.boxShadow = `0 1px 2px rgba(0, 0, 0, 0.2)`;
+      }
       div.style.border = "1px solid " + stroke;
       div.style.borderRadius = "8px";
-      div.style.boxShadow = `0 3px 6px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.15)`;
     } else {
-      
-      div.style.backgroundColor = el.type === "label" ? "transparent" : fill;
       if (el.type === "button") {
+        if (shouldFill) {
+          div.style.backgroundColor = fill;
+          div.style.boxShadow = `0 2px 4px rgba(0, 0, 0, 0.2)`;
+        } else {
+          div.style.backgroundColor = "transparent";
+          div.style.background = "none";
+          div.style.boxShadow = `0 1px 2px rgba(0, 0, 0, 0.2)`;
+        }
         div.style.borderRadius = "6px";
         div.style.border = "1px solid " + stroke;
-        div.style.boxShadow = `0 2px 4px rgba(0, 0, 0, 0.2)`;
         div.style.cursor = "pointer";
+      } else {
+        div.style.backgroundColor = el.type === "label" ? "transparent" : (shouldFill ? fill : "transparent");
       }
       div.style.color = textColor;
       if (elementHasText(el.type)) {
@@ -638,11 +1221,18 @@ function enableResize(handle, elementId, direction) {
 
     const el = elements.find((el) => el.id === elementId);
     if (!el) return;
-    
+
     startWidth = el.w;
     startHeight = el.h;
     startXPos = el.x;
     startYPos = el.y;
+
+    // Add resizing class for visual feedback
+    const elementDiv = handle.closest('.ui-element');
+    if (elementDiv) {
+      elementDiv.classList.add('resizing');
+    }
+    preview.classList.add('manipulating');
 
     document.addEventListener("mousemove", onResizeMove);
     document.addEventListener("mouseup", onResizeUp);
@@ -701,6 +1291,14 @@ function enableResize(handle, elementId, direction) {
       pushHistory();
     }
     isResizing = false;
+
+    // Remove resizing class
+    const elementDiv = handle.closest('.ui-element');
+    if (elementDiv) {
+      elementDiv.classList.remove('resizing');
+    }
+    preview.classList.remove('manipulating');
+
     document.removeEventListener("mousemove", onResizeMove);
     document.removeEventListener("mouseup", onResizeUp);
   }
@@ -715,7 +1313,6 @@ function enableDrag(node, id) {
   let origY = 0;
 
   node.addEventListener("mousedown", (e) => {
-    
     if (e.target.classList.contains("resize-handle")) {
       return;
     }
@@ -729,6 +1326,10 @@ function enableDrag(node, id) {
     if (!el) return;
     origX = el.x;
     origY = el.y;
+
+    // Add dragging class for visual feedback
+    node.classList.add('dragging');
+    preview.classList.add('manipulating');
 
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
@@ -763,6 +1364,11 @@ function enableDrag(node, id) {
       pushHistory();
     }
     isDragging = false;
+
+    // Remove dragging class
+    node.classList.remove('dragging');
+    preview.classList.remove('manipulating');
+
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("mouseup", onMouseUp);
   }
@@ -774,6 +1380,64 @@ function selectElement(id, push = true) {
   updatePropsInputs();
   renderElements();
   if (push) pushHistory();
+
+  // Add visual feedback for selection
+  setTimeout(() => {
+    const elementDiv = document.querySelector(`[data-id="${id}"]`);
+    if (elementDiv) {
+      elementDiv.style.animation = 'none';
+      elementDiv.offsetHeight; // Trigger reflow
+      elementDiv.style.animation = 'pulse 0.3s ease-out';
+    }
+  }, 50);
+}
+
+// Utility function to cycle through elements with Tab key
+function selectNextElement() {
+  if (elements.length === 0) return;
+
+  let currentIndex = -1;
+  if (selectedId) {
+    currentIndex = elements.findIndex(el => el.id === selectedId);
+  }
+
+  const nextIndex = (currentIndex + 1) % elements.length;
+  selectElement(elements[nextIndex].id, false);
+}
+
+function selectPreviousElement() {
+  if (elements.length === 0) return;
+
+  let currentIndex = -1;
+  if (selectedId) {
+    currentIndex = elements.findIndex(el => el.id === selectedId);
+  }
+
+  const prevIndex = currentIndex <= 0 ? elements.length - 1 : currentIndex - 1;
+  selectElement(elements[prevIndex].id, false);
+}
+
+// Utility function to bring element to front/back
+function bringToFront(elementId) {
+  const index = elements.findIndex(el => el.id === elementId);
+  if (index > -1) {
+    const element = elements.splice(index, 1)[0];
+    elements.push(element);
+    renderElements();
+    updateCode();
+    pushHistory();
+  }
+}
+
+function sendToBack(elementId) {
+  const index = elements.findIndex(el => el.id === elementId);
+  if (index > -1) {
+    const element = elements.splice(index, 1)[0];
+    elements.unshift(element);
+    renderElements();
+    updateCode();
+    pushHistory();
+  }
 }
 
 function refreshActionTargetOptions(el) {
@@ -810,6 +1474,30 @@ function updatePropsInputs(push = false) {
   propFillColor.value = el.fillColor || "#ffffff";
   propStrokeColor.value = el.strokeColor || "#ffffff";
   propTextColor.value = el.textColor || "#ffffff";
+
+  if (driverMode === "u8g2") {
+    // OLED mode: use binary fill control
+    const isFilled = el.oledFill !== false; // Default to true
+    propOLEDFill.checked = isFilled;
+    fillTransparencyRow.style.display = "none";
+    oledFillRow.style.display = elementHasFill(el.type) ? "block" : "none";
+
+    // Disable fill color picker when OLED fill is off
+    propFillColor.disabled = !isFilled;
+    propFillColor.style.opacity = isFilled ? "1" : "0.3";
+    propFillColor.style.cursor = isFilled ? "pointer" : "not-allowed";
+  } else {
+    // TFT mode: use alpha transparency
+    propFillAlpha.value = el.fillAlpha != null ? el.fillAlpha : 255;
+    fillAlphaValue.textContent = Math.round((el.fillAlpha != null ? el.fillAlpha : 255) / 255 * 100) + "%";
+    fillTransparencyRow.style.display = elementHasFill(el.type) ? "block" : "none";
+    oledFillRow.style.display = "none";
+
+    // Re-enable fill color picker for TFT mode
+    propFillColor.disabled = false;
+    propFillColor.style.opacity = "1";
+    propFillColor.style.cursor = "pointer";
+  }
   propValue.value = el.value != null ? el.value : 50;
   propFont.value = el.font || DEFAULT_U8G2_FONT;
 
@@ -924,17 +1612,27 @@ function generateTFTCode() {
       const fill565 = hexToRgb565(el.fillColor || "#FFFFFF");
       const stroke565 = hexToRgb565(el.strokeColor || "#FFFFFF");
       const text565 = hexToRgb565(el.textColor || "#FFFFFF");
+      const fillAlpha = el.fillAlpha != null ? el.fillAlpha : 255;
 
       if (el.type === "rect") {
-        code += `  ${drv}.fillRect(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${fill565});\n`;
+        // Only draw fill if not fully transparent
+        if (fillAlpha > 0) {
+          code += `  ${drv}.fillRect(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${fill565});\n`;
+        }
       } else if (el.type === "roundrect") {
-        code += `  ${drv}.fillRoundRect(${el.x}, ${el.y}, ${el.w}, ${el.h}, 4, ${fill565});\n`;
+        // Only draw fill if not fully transparent
+        if (fillAlpha > 0) {
+          code += `  ${drv}.fillRoundRect(${el.x}, ${el.y}, ${el.w}, ${el.h}, 4, ${fill565});\n`;
+        }
         code += `  ${drv}.drawRoundRect(${el.x}, ${el.y}, ${el.w}, ${el.h}, 4, ${stroke565});\n`;
       } else if (el.type === "circle") {
         const r = Math.floor(Math.min(el.w, el.h) / 2);
         const cx = el.x + r;
         const cy = el.y + r;
-        code += `  ${drv}.fillCircle(${cx}, ${cy}, ${r}, ${fill565});\n`;
+        // Only draw fill if not fully transparent
+        if (fillAlpha > 0) {
+          code += `  ${drv}.fillCircle(${cx}, ${cy}, ${r}, ${fill565});\n`;
+        }
       } else if (el.type === "line") {
         code += `  ${drv}.drawLine(${el.x}, ${el.y}, ${el.x + el.w}, ${el.y + el.h}, ${stroke565});\n`;
       } else if (el.type === "divider") {
@@ -1015,7 +1713,10 @@ function generateTFTCode() {
 
   code += "void setup() {\n";
   code += "  tft.init();\n";
-  code += "  tft.setRotation(1);\n";
+
+  // Add TFT rotation setting
+  code += `  tft.setRotation(${tftSettingsState.rotation});\n`;
+
   code += "  tft.setTextDatum(TL_DATUM);\n";
   code += "  tft.setTextFont(1);\n";
   if (useSprite) {
@@ -1043,7 +1744,54 @@ function generateU8g2Code() {
   } else {
     code += preset.ctor + "\n\n";
   }
-  // removed comment-only generated lines
+
+  // Add OLED settings initialization
+  code += "void setup() {\n";
+  code += "  // Initialize OLED display\n";
+  code += "  u8g2.begin();\n";
+
+  // Add rotation setting
+  if (oledSettingsState.rotation !== 0) {
+    const rotationCommands = {
+      1: "u8g2.setDisplayRotation(U8G2_R1);",
+      2: "u8g2.setDisplayRotation(U8G2_R2);",
+      3: "u8g2.setDisplayRotation(U8G2_R3);"
+    };
+    if (rotationCommands[oledSettingsState.rotation]) {
+      code += `  ${rotationCommands[oledSettingsState.rotation]}\n`;
+    }
+  }
+
+  // Add contrast setting
+  if (oledSettingsState.contrast !== 127) {
+    code += `  u8g2.setContrast(${oledSettingsState.contrast});\n`;
+  }
+
+  // Add flip mode
+  if (oledSettingsState.flipMode !== "none") {
+    const flipCommands = {
+      "horizontal": "u8g2.setFlipMode(1);",
+      "vertical": "u8g2.setFlipMode(1);", // U8g2 doesn't have separate horizontal/vertical, just flip
+      "both": "u8g2.setFlipMode(1);"
+    };
+    if (flipCommands[oledSettingsState.flipMode]) {
+      code += `  ${flipCommands[oledSettingsState.flipMode]}\n`;
+    }
+  }
+
+  // Add font mode
+  if (oledSettingsState.fontMode === "solid") {
+    code += "  u8g2.setFontMode(1);\n"; // Solid background
+  } else {
+    code += "  u8g2.setFontMode(0);\n"; // Transparent background
+  }
+
+  // Add power save mode
+  if (oledSettingsState.powerSave === "auto") {
+    code += "  u8g2.setPowerSave(1);\n"; // Enable power save initially
+  }
+
+  code += "}\n\n";
 
   
   screens.forEach(scr => {
@@ -1062,15 +1810,27 @@ function generateU8g2Code() {
       }
 
       if (el.type === "rect") {
-        code += `  u8g2.drawBox(${el.x}, ${el.y}, ${el.w}, ${el.h});\n`;
+        if (el.oledFill !== false) {
+          code += `  u8g2.drawBox(${el.x}, ${el.y}, ${el.w}, ${el.h});\n`;
+        } else {
+          code += `  u8g2.drawFrame(${el.x}, ${el.y}, ${el.w}, ${el.h});\n`;
+        }
       } else if (el.type === "roundrect") {
         const r = 4;
-        code += `  u8g2.drawRBox(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r});\n`;
+        if (el.oledFill !== false) {
+          code += `  u8g2.drawRBox(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r});\n`;
+        } else {
+          code += `  u8g2.drawRFrame(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r});\n`;
+        }
       } else if (el.type === "circle") {
         const r = Math.floor(Math.min(el.w, el.h) / 2);
         const cx = el.x + r;
         const cy = el.y + r;
-        code += `  u8g2.drawDisc(${cx}, ${cy}, ${r});\n`;
+        if (el.oledFill !== false) {
+          code += `  u8g2.drawDisc(${cx}, ${cy}, ${r});\n`;
+        } else {
+          code += `  u8g2.drawCircle(${cx}, ${cy}, ${r});\n`;
+        }
       } else if (el.type === "line") {
         code += `  u8g2.drawLine(${el.x}, ${el.y}, ${el.x + el.w}, ${el.y + el.h});\n`;
       } else if (el.type === "divider") {
@@ -1080,11 +1840,21 @@ function generateU8g2Code() {
         code += `  u8g2.drawUTF8(${el.x}, ${el.y} + 10, "${txtEsc}");\n\n`;
       } else if (el.type === "button") {
         const r = 4;
-        code += `  u8g2.drawRFrame(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r});\n`;
+        if (el.oledFill !== false) {
+          code += `  u8g2.drawRBox(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r});\n`;
+        } else {
+          code += `  u8g2.drawRFrame(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r});\n`;
+        }
         if (txtEsc.length) {
           const textY = el.y + Math.floor(el.h / 2) + 4;
           code += `  u8g2.setFont(${font});\n`;
+          if (el.oledFill !== false) {
+            code += `  u8g2.setDrawColor(0);\n`;
+          }
           code += `  u8g2.drawUTF8(${el.x + 4}, ${textY}, "${txtEsc}");\n`;
+          if (el.oledFill !== false) {
+            code += "  u8g2.setDrawColor(1);\n";
+          }
         }
         code += "\n";
       } else if (el.type === "progress") {
@@ -1107,7 +1877,11 @@ function generateU8g2Code() {
         const knobX = on ? el.x + el.w - r : el.x;
         code += `  u8g2.drawDisc(${knobX}, ${centerY}, ${r - 2});\n\n`;
       } else if (el.type === "header") {
-        code += `  u8g2.drawBox(${el.x}, ${el.y}, ${el.w}, ${el.h});\n`;
+        if (el.oledFill !== false) {
+          code += `  u8g2.drawBox(${el.x}, ${el.y}, ${el.w}, ${el.h});\n`;
+        } else {
+          code += `  u8g2.drawFrame(${el.x}, ${el.y}, ${el.w}, ${el.h});\n`;
+        }
         if (txtEsc.length) {
           const textY = el.y + el.h - 4;
           code += `  u8g2.setFont(${font});\n`;
@@ -1116,7 +1890,11 @@ function generateU8g2Code() {
           code += "  u8g2.setDrawColor(1);\n\n";
         }
       } else if (el.type === "card") {
-        code += `  u8g2.drawRFrame(${el.x}, ${el.y}, ${el.w}, ${el.h}, 4);\n`;
+        if (el.oledFill !== false) {
+          code += `  u8g2.drawRBox(${el.x}, ${el.y}, ${el.w}, ${el.h}, 4);\n`;
+        } else {
+          code += `  u8g2.drawRFrame(${el.x}, ${el.y}, ${el.w}, ${el.h}, 4);\n`;
+        }
         if (txtEsc.length) {
           const textY = el.y + 10;
           code += `  u8g2.setFont(${font});\n`;
@@ -1210,13 +1988,114 @@ gridSizeInput.addEventListener("input", () => {
 
 displayDriverSelect.addEventListener("change", () => {
   driverMode = displayDriverSelect.value;
+
+  // Set default dimensions based on display mode
+  if (driverMode === "u8g2") {
+    dispWidth = 128;
+    dispHeight = 64;
+  } else if (driverMode === "tft") {
+    dispWidth = 240;
+    dispHeight = 320;
+  }
+
+  dispWidthInput.value = dispWidth;
+  dispHeightInput.value = dispHeight;
+
+  updateDisplaySettingsVisibility();
   updatePreviewSize();
+  renderElements(); // Re-render elements with new display mode styling
+  updatePropsInputs(); // Update property controls for new mode
   updateCode();
   pushHistory();
 });
 
+function updateDisplaySettingsVisibility() {
+  // Hide all settings panels
+  tftSettings.classList.remove("tft-active");
+  oledSettings.classList.remove("oled-active");
+
+  // Show appropriate settings panel
+  if (driverMode === "tft") {
+    tftSettings.classList.add("tft-active");
+    // Initialize TFT settings
+    tftRotation.value = tftSettingsState.rotation;
+    tftColorDepth.value = tftSettingsState.colorDepth;
+    tftBacklight.value = tftSettingsState.backlight;
+    tftTouch.value = tftSettingsState.touch;
+  } else if (driverMode === "u8g2") {
+    oledSettings.classList.add("oled-active");
+    // Initialize OLED settings
+    oledRotation.value = oledSettingsState.rotation;
+    oledContrast.value = oledSettingsState.contrast;
+    oledContrastValue.textContent = oledSettingsState.contrast;
+    oledFlipMode.value = oledSettingsState.flipMode;
+    oledFontMode.value = oledSettingsState.fontMode;
+    oledPowerSave.value = oledSettingsState.powerSave;
+  }
+
+  // Update element properties to show correct fill controls
+  updatePropsInputs();
+}
+
 u8g2PresetSelect.addEventListener("change", () => {
   u8g2PresetId = u8g2PresetSelect.value;
+  updateCode();
+  pushHistory();
+});
+
+// TFT Settings Event Listeners
+tftRotation.addEventListener("change", () => {
+  tftSettingsState.rotation = parseInt(tftRotation.value);
+  updateCode();
+  pushHistory();
+});
+
+tftColorDepth.addEventListener("change", () => {
+  tftSettingsState.colorDepth = parseInt(tftColorDepth.value);
+  updateCode();
+  pushHistory();
+});
+
+tftBacklight.addEventListener("change", () => {
+  tftSettingsState.backlight = tftBacklight.value;
+  updateCode();
+  pushHistory();
+});
+
+tftTouch.addEventListener("change", () => {
+  tftSettingsState.touch = tftTouch.value;
+  updateCode();
+  pushHistory();
+});
+
+// OLED Settings Event Listeners
+oledRotation.addEventListener("change", () => {
+  oledSettingsState.rotation = parseInt(oledRotation.value);
+  updateCode();
+  pushHistory();
+});
+
+oledContrast.addEventListener("input", () => {
+  oledSettingsState.contrast = parseInt(oledContrast.value);
+  oledContrastValue.textContent = oledSettingsState.contrast;
+  updateCode();
+  pushHistory();
+});
+
+oledFlipMode.addEventListener("change", () => {
+  oledSettingsState.flipMode = oledFlipMode.value;
+  updateCode();
+  pushHistory();
+});
+
+oledFontMode.addEventListener("change", () => {
+  oledSettingsState.fontMode = oledFontMode.value;
+  updateCode();
+  pushHistory();
+});
+
+oledPowerSave.addEventListener("change", () => {
+  oledSettingsState.powerSave = oledPowerSave.value;
   updateCode();
   pushHistory();
 });
@@ -1352,6 +2231,7 @@ function addElement(type) {
   let textSize = 2;
   let value = 50;
 
+  // Enhanced element properties based on type
   if (type === "label") {
     baseW = 80;
     baseH = 20;
@@ -1361,22 +2241,22 @@ function addElement(type) {
     baseH = 28;
     text = "Button";
   } else if (type === "header") {
-    baseW = dispWidth;
+    baseW = Math.min(dispWidth - 20, 200); // Responsive width
     baseH = 24;
     text = "Header";
   } else if (type === "card") {
-    baseW = 100;
-    baseH = 50;
+    baseW = 120;
+    baseH = 60;
     text = "Card";
   } else if (type === "divider") {
-    baseW = 80;
+    baseW = Math.min(dispWidth - 40, 150);
     baseH = 2;
   } else if (type === "progress") {
-    baseW = 100;
+    baseW = 120;
     baseH = 16;
     value = 60;
   } else if (type === "slider") {
-    baseW = 100;
+    baseW = 120;
     baseH = 18;
     value = 40;
   } else if (type === "toggle") {
@@ -1384,22 +2264,61 @@ function addElement(type) {
     baseH = 20;
     value = 0;
   } else if (type === "circle") {
-    baseW = 30;
-    baseH = 30;
+    baseW = 40;
+    baseH = 40;
+  }
+
+  // Smart positioning - place new elements in a grid pattern or near existing elements
+  const existingElements = elements.length;
+  let x, y;
+
+  if (existingElements === 0) {
+    // First element - center it
+    x = Math.round((dispWidth - baseW) / 2);
+    y = Math.round((dispHeight - baseH) / 2);
+  } else {
+    // Subsequent elements - position in a cascading pattern
+    const lastElement = elements[elements.length - 1];
+    x = Math.min(lastElement.x + 20, dispWidth - baseW - 10);
+    y = Math.min(lastElement.y + 20, dispHeight - baseH - 10);
+
+    // If it would go off-screen, wrap to next row
+    if (x + baseW > dispWidth - 10) {
+      x = 10;
+      y = Math.min(y + 60, dispHeight - baseH - 10);
+    }
+  }
+
+  // Ensure element stays within bounds
+  x = Math.max(5, Math.min(x, dispWidth - baseW - 5));
+  y = Math.max(5, Math.min(y, dispHeight - baseH - 5));
+
+  // Auto-pick defaults that contrast with the current background
+  const defaultStroke = getContrastingColor(bgColor);
+  // Fill defaults: on light backgrounds, default to dark fill; on dark backgrounds, default to light fill
+  const defaultFill = defaultStroke;
+  const defaultText = isLightColor(defaultFill) ? "#111827" : "#FFFFFF";
+
+  // Apply grid snapping if enabled
+  if (snapToGrid && gridSize > 0) {
+    x = Math.round(x / gridSize) * gridSize;
+    y = Math.round(y / gridSize) * gridSize;
   }
 
   const el = {
     id,
     type,
-    x: Math.round((dispWidth - baseW) / 2),
-    y: Math.round((dispHeight - baseH) / 2),
+    x: Math.round(x),
+    y: Math.round(y),
     w: baseW,
     h: baseH,
     text,
     textSize,
-    fillColor: type === "label" ? "#000000" : "#ffffff",
-    strokeColor: "#ffffff",
-    textColor: "#000000",
+    fillColor: defaultFill,
+    strokeColor: defaultStroke,
+    textColor: defaultText,
+    fillAlpha: 255, // 0 = transparent, 255 = opaque
+    oledFill: true, // For OLED: true = filled, false = transparent
     value,
     actionType: "",
     actionTargetScreenId: null,
@@ -1408,6 +2327,18 @@ function addElement(type) {
 
   elements.push(el);
   selectedId = id;
+
+  // Add visual feedback for element creation
+  setTimeout(() => {
+    const elementDiv = document.querySelector(`[data-id="${id}"]`);
+    if (elementDiv) {
+      elementDiv.classList.add('creating');
+      setTimeout(() => {
+        elementDiv.classList.remove('creating');
+      }, 300);
+    }
+  }, 50);
+
   updatePreviewSize();
   renderElements();
   updatePropsInputs();
@@ -1455,6 +2386,31 @@ propFillColor.addEventListener("input", () => {
   const el = elements.find((el) => el.id === selectedId);
   if (!el) return;
   el.fillColor = propFillColor.value;
+  renderElements();
+  updateCode();
+  pushHistory();
+});
+
+propFillAlpha.addEventListener("input", () => {
+  const el = elements.find((el) => el.id === selectedId);
+  if (!el) return;
+  el.fillAlpha = parseInt(propFillAlpha.value);
+  fillAlphaValue.textContent = Math.round(el.fillAlpha / 255 * 100) + "%";
+  renderElements();
+  updateCode();
+  pushHistory();
+});
+
+propOLEDFill.addEventListener("change", () => {
+  const el = elements.find((el) => el.id === selectedId);
+  if (!el) return;
+  el.oledFill = propOLEDFill.checked;
+
+  // Update fill color picker state
+  propFillColor.disabled = !propOLEDFill.checked;
+  propFillColor.style.opacity = propOLEDFill.checked ? "1" : "0.3";
+  propFillColor.style.cursor = propOLEDFill.checked ? "pointer" : "not-allowed";
+
   renderElements();
   updateCode();
   pushHistory();
@@ -1537,9 +2493,18 @@ deleteElementBtn.addEventListener("click", () => {
 
 preview.addEventListener("mousedown", (e) => {
   if (e.target.classList.contains("ui-element")) {
+    // Clicked on an element - select it
     const id = e.target.dataset.id;
     selectElement(id, false);
     pushHistory();
+  } else {
+    // Clicked on empty space - deselect current element
+    if (selectedId) {
+      selectedId = null;
+      updatePropsInputs();
+      renderElements();
+      pushHistory();
+    }
   }
 });
 
@@ -1582,10 +2547,27 @@ duplicateBtn.addEventListener("click", () => {
   const id = makeId();
   const copy = JSON.parse(JSON.stringify(el));
   copy.id = id;
-  copy.x = el.x + 5;
-  copy.y = el.y + 5;
+  copy.x = el.x + 10;
+  copy.y = el.y + 10;
+
+  // Ensure the copy stays within bounds
+  copy.x = Math.min(copy.x, dispWidth - copy.w);
+  copy.y = Math.min(copy.y, dispHeight - copy.h);
+
   elements.push(copy);
   selectedId = id;
+
+  // Add visual feedback for duplication
+  setTimeout(() => {
+    const elementDiv = document.querySelector(`[data-id="${id}"]`);
+    if (elementDiv) {
+      elementDiv.classList.add('creating');
+      setTimeout(() => {
+        elementDiv.classList.remove('creating');
+      }, 300);
+    }
+  }, 50);
+
   renderElements();
   updatePropsInputs();
   updateCode();
@@ -1691,23 +2673,61 @@ document.addEventListener("keydown", (e) => {
   const tag = e.target.tagName.toLowerCase();
   if (["input", "textarea", "select"].includes(tag)) return;
 
+  // Undo/Redo
   if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)) {
-    
     e.preventDefault();
-    if (historyIndex > 0) {
-      historyIndex--;
-      updateUndoRedoButtons();
-      applyStateSnapshot(history[historyIndex]);
+    if (e.shiftKey || e.key === "y" || e.key === "Y") {
+      // Redo
+      if (historyIndex < history.length - 1) {
+        historyIndex++;
+        updateUndoRedoButtons();
+        applyStateSnapshot(history[historyIndex]);
+      }
+    } else {
+      // Undo
+      if (historyIndex > 0) {
+        historyIndex--;
+        updateUndoRedoButtons();
+        applyStateSnapshot(history[historyIndex]);
+      }
     }
     return;
   }
-  if ((e.key === "y" || (e.key === "Z" && e.shiftKey)) && (e.ctrlKey || e.metaKey)) {
-    
+
+  // Duplicate element (Ctrl+D)
+  if ((e.key === "d" || e.key === "D") && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
-    if (historyIndex < history.length - 1) {
-      historyIndex++;
-      updateUndoRedoButtons();
-      applyStateSnapshot(history[historyIndex]);
+    duplicateBtn.click();
+    return;
+  }
+
+  // Select all elements (Ctrl+A) - selects first element
+  if ((e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    if (!selectedId && elements.length > 0) {
+      selectElement(elements[0].id);
+    }
+    return;
+  }
+
+  // Tab to cycle through elements
+  if (e.key === "Tab") {
+    e.preventDefault();
+    if (e.shiftKey) {
+      selectPreviousElement();
+    } else {
+      selectNextElement();
+    }
+    return;
+  }
+
+  // Bring to front/back (Ctrl+Shift+Up/Down)
+  if ((e.key === "ArrowUp" || e.key === "ArrowDown") && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+    e.preventDefault();
+    if (e.key === "ArrowUp") {
+      bringToFront(selectedId);
+    } else {
+      sendToBack(selectedId);
     }
     return;
   }
@@ -1715,6 +2735,7 @@ document.addEventListener("keydown", (e) => {
   const el = elements.find((el) => el.id === selectedId);
   if (!el) return;
 
+  // Delete element
   if (e.key === "Delete" || e.key === "Backspace") {
     e.preventDefault();
     elements = elements.filter((x) => x.id !== selectedId);
@@ -1728,13 +2749,15 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
+  // Element movement with arrow keys
   if (e.key.startsWith("Arrow")) {
     e.preventDefault();
-    const step = e.shiftKey ? 10 : 1;
-    if (e.key === "ArrowLeft") el.x -= step;
-    if (e.key === "ArrowRight") el.x += step;
-    if (e.key === "ArrowUp") el.y -= step;
-    if (e.key === "ArrowDown") el.y += step;
+    const step = e.shiftKey ? (snapToGrid ? gridSize * 2 : 10) : (snapToGrid ? gridSize : 1);
+
+    if (e.key === "ArrowLeft") el.x = Math.max(0, el.x - step);
+    if (e.key === "ArrowRight") el.x = Math.min(dispWidth - el.w, el.x + step);
+    if (e.key === "ArrowUp") el.y = Math.max(0, el.y - step);
+    if (e.key === "ArrowDown") el.y = Math.min(dispHeight - el.h, el.y + step);
 
     if (snapToGrid && gridSize > 0) {
       el.x = Math.round(el.x / gridSize) * gridSize;
@@ -1745,6 +2768,46 @@ document.addEventListener("keydown", (e) => {
     renderElements();
     updateCode();
     pushHistory();
+    return;
+  }
+
+  // Quick alignment shortcuts
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === "1") {
+      e.preventDefault();
+      alignSelected("left");
+    } else if (e.key === "2") {
+      e.preventDefault();
+      alignSelected("hcenter");
+    } else if (e.key === "3") {
+      e.preventDefault();
+      alignSelected("right");
+    } else if (e.key === "4") {
+      e.preventDefault();
+      alignSelected("top");
+    } else if (e.key === "5") {
+      e.preventDefault();
+      alignSelected("vcenter");
+    } else if (e.key === "6") {
+      e.preventDefault();
+      alignSelected("bottom");
+    }
+  }
+
+  // Element type switching (number keys)
+  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+    const numberKey = parseInt(e.key);
+    if (numberKey >= 1 && numberKey <= 9) {
+      e.preventDefault();
+      const elementTypes = ["rect", "roundrect", "circle", "line", "divider", "label", "button", "progress", "slider"];
+      if (numberKey <= elementTypes.length) {
+        el.type = elementTypes[numberKey - 1];
+        renderElements();
+        updatePropsInputs();
+        updateCode();
+        pushHistory();
+      }
+    }
   }
 });
 
@@ -1755,6 +2818,7 @@ snapToGrid = snapCheckbox.checked;
 gridSize = parseInt(gridSizeInput.value, 10) || 4;
 
 initU8g2Presets();
+updateDisplaySettingsVisibility();
 initFontList();
 initScreens();
 

@@ -1,0 +1,3118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>BitCanvas Studio – Animation Tool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="../theme.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      font-size: 13px;
+    }
+
+    .app-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: radial-gradient(circle at top, var(--bg-secondary), var(--bg-primary));
+    }
+
+    .app-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--btn-primary);
+    }
+
+    .app-subtitle {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .app-header-right {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      text-align: right;
+    }
+
+    .app-main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr) 320px;
+      gap: 0;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .panel {
+      --panel-pad: 16px;
+      padding: var(--panel-pad);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      overflow-y: auto;
+      scrollbar-width: thin;
+      position: relative;
+      overscroll-behavior: contain;
+    }
+
+    .panel-right {
+      border-right: none;
+      border-left: 1px solid var(--border-color);
+      --panel-pad: 10px;
+    }
+
+    .panel h2 {
+      font-size: 13px;
+      margin: 0 0 8px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-secondary);
+    }
+
+    .panel-section {
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed var(--border-color);
+    }
+
+    .panel-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    /* Subtle scroll shadows (helps show scrollability without harsh scrollbars) */
+    .panel::before,
+    .panel::after {
+      content: "";
+      display: block;
+      height: 16px;
+      pointer-events: none;
+      position: sticky;
+      z-index: 5;
+    }
+    .panel::before {
+      top: 0;
+      margin: calc(var(--panel-pad) * -1) calc(var(--panel-pad) * -1) 0 calc(var(--panel-pad) * -1);
+      background: linear-gradient(to bottom, var(--bg-secondary), rgba(0, 0, 0, 0));
+    }
+    .panel::after {
+      bottom: 0;
+      margin: 0 calc(var(--panel-pad) * -1) calc(var(--panel-pad) * -1) calc(var(--panel-pad) * -1);
+      background: linear-gradient(to top, var(--bg-secondary), rgba(0, 0, 0, 0));
+    }
+
+    /* Base form typography to match DisplayKit */
+    label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    /* Inputs/Selects */
+    input[type="number"],
+    input[type="text"],
+    input[type="file"],
+    select {
+      background: var(--input-bg);
+      border-radius: 10px;
+      border: 1px solid var(--input-border);
+      padding: 8px 10px;
+      color: var(--text-primary);
+      font-size: 12px;
+      width: 100%;
+      outline: none;
+    }
+
+    input[type="number"]:focus,
+    input[type="text"]:focus,
+    input[type="file"]:focus,
+    select:focus {
+      border-color: var(--btn-primary);
+      box-shadow: 0 0 0 2px var(--glow-primary);
+    }
+
+    /* File picker button (Chrome/Edge) */
+    input[type="file"]::file-selector-button {
+      border-radius: 10px;
+      border: 1px solid var(--btn-secondary-border);
+      background: var(--btn-secondary);
+      color: var(--text-primary);
+      padding: 7px 10px;
+      margin-right: 10px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    input[type="file"]::file-selector-button:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--border-color);
+    }
+
+    /* Buttons */
+    button {
+      border-radius: 10px;
+      border: 1px solid var(--btn-secondary-border);
+      background: var(--btn-secondary);
+      color: var(--text-primary);
+      padding: 8px 10px;
+      min-height: 34px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+    }
+
+    button:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--border-color);
+      transform: translateY(-0.5px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.primary {
+      background: var(--btn-primary);
+      border-color: var(--btn-primary);
+      color: white;
+    }
+
+    button.primary:hover {
+      background: var(--btn-primary-hover);
+      border-color: var(--btn-primary-hover);
+      filter: none;
+    }
+
+    button.danger {
+      background: transparent;
+      border-color: var(--btn-danger);
+      color: var(--btn-danger);
+    }
+    button.danger:hover {
+      background: rgba(249, 115, 115, 0.12);
+      border-color: var(--btn-danger);
+      transform: translateY(-0.5px);
+    }
+
+    button.small {
+      min-height: 30px;
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+
+    button.full {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    /* Normalize spacing even when inline styles exist in the HTML */
+    .button-row {
+      gap: 10px !important;
+      margin-top: 10px !important;
+    }
+    label[style] {
+      margin-top: 10px !important;
+    }
+
+    .button-row > button.small:not(.full) {
+      flex: 1 1 0;
+      min-width: 84px;
+    }
+
+    /* Drawing tools: Elementor-like tiles (match main page widget vibe) */
+    .bc-tool-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 1024px) {
+      .bc-tool-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 860px) {
+      .bc-tool-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 520px) {
+      .bc-tool-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    .bc-tool-tile {
+      width: 100%;
+      min-height: 86px;
+      border-radius: 16px;
+      padding: 10px 10px;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid rgba(255, 109, 31, 0.22);
+      background: linear-gradient(
+        135deg,
+        rgba(255, 109, 31, 0.10),
+        rgba(255, 109, 31, 0.04)
+      );
+      box-shadow:
+        0 10px 22px rgba(0, 0, 0, 0.12),
+        0 0 0 1px rgba(255, 109, 31, 0.06);
+    }
+
+    .bc-tool-tile:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255, 109, 31, 0.55);
+      background: linear-gradient(
+        135deg,
+        rgba(255, 109, 31, 0.14),
+        rgba(255, 109, 31, 0.06)
+      );
+    }
+
+    .bc-tool-tile:active {
+      transform: translateY(0);
+    }
+
+    .bc-tool-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: var(--btn-primary);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow:
+        0 10px 20px rgba(0, 0, 0, 0.18),
+        0 0 0 1px rgba(255, 109, 31, 0.10);
+      color: white;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .bc-tool-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: 0.01em;
+      line-height: 1;
+      opacity: 0.92;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    /* Active tool state: match DisplayKit accent */
+    .bc-tool-tile.primary {
+      background: linear-gradient(135deg, var(--btn-primary), var(--btn-primary-hover));
+      border-color: rgba(255, 255, 255, 0.25);
+      color: white;
+      box-shadow: 0 12px 26px rgba(255, 109, 31, 0.22);
+    }
+
+    .bc-tool-tile.primary .bc-tool-icon {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+
+    .bc-tool-tile.primary .bc-tool-label {
+      color: white;
+      opacity: 1;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+
+    /* Checkboxes / toggle rows (make them look like UI components, not OS widgets) */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-primary);
+    }
+
+    .toggle-row input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      border: 2px solid var(--border-color);
+      background: var(--bg-secondary);
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 18px;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
+    }
+
+    .toggle-row input[type="checkbox"]::after {
+      content: "";
+      width: 10px;
+      height: 6px;
+      border-left: 2px solid transparent;
+      border-bottom: 2px solid transparent;
+      transform: rotate(-45deg) translateY(-0.5px);
+      transform-origin: center;
+    }
+
+    .toggle-row input[type="checkbox"]:checked {
+      background: var(--btn-primary);
+      border-color: var(--btn-primary);
+      box-shadow: 0 0 0 3px var(--glow-primary);
+    }
+
+    .toggle-row input[type="checkbox"]:checked::after {
+      border-left-color: white;
+      border-bottom-color: white;
+    }
+
+    .toggle-row input[type="checkbox"]:active {
+      transform: scale(0.98);
+    }
+
+    .toggle-row input[type="checkbox"]:focus-visible {
+      outline: 2px solid rgba(255, 109, 31, 0.45);
+      outline-offset: 2px;
+    }
+
+    .toggle-row span {
+      user-select: none;
+      line-height: 1.2;
+    }
+
+    /* Range controls: make them feel consistent */
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--btn-primary);
+    }
+
+    /* Small notes a bit clearer */
+    .small-note {
+      margin-top: 4px;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Left sidebar: match DisplayKit main sidebar look                         */
+    /* ---------------------------------------------------------------------- */
+
+    /* Only apply to the LEFT panel (right panel keeps its own "properties" feel) */
+    .app-main > aside.panel:not(.panel-right) {
+      background: var(--bg-secondary);
+      border-right: 2px solid var(--btn-primary);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+    }
+
+    .app-main > aside.panel:not(.panel-right) .panel-section {
+      border-bottom: none;
+      padding: 14px;
+      margin-bottom: 14px;
+      border-radius: 18px;
+      border: 2px solid rgba(255, 109, 31, 0.28);
+      background: linear-gradient(
+        135deg,
+        rgba(255, 109, 31, 0.08),
+        rgba(255, 109, 31, 0.03)
+      );
+      box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.12),
+        0 0 0 1px rgba(255, 109, 31, 0.08);
+    }
+
+    .app-main > aside.panel:not(.panel-right) .panel-section:hover {
+      box-shadow:
+        0 14px 32px rgba(0, 0, 0, 0.16),
+        0 0 0 1px rgba(255, 109, 31, 0.14);
+    }
+
+    /* DisplayKit-style section header pill (like .section-title) */
+    .app-main > aside.panel:not(.panel-right) .panel-section > h2 {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.10em;
+      color: var(--btn-primary);
+      margin: 0 0 10px 0;
+      padding: 6px 10px;
+      border-radius: 12px;
+      border: 2px solid rgba(255, 109, 31, 0.22);
+      background: linear-gradient(
+        135deg,
+        rgba(255, 109, 31, 0.12),
+        rgba(255, 109, 31, 0.04)
+      );
+      box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.14),
+        0 0 0 1px rgba(255, 109, 31, 0.10);
+    }
+
+    .app-main > aside.panel:not(.panel-right) .hint {
+      color: var(--text-tertiary);
+    }
+
+    /* Make input focus + button focus feel like DisplayKit */
+    .app-main > aside.panel:not(.panel-right) button:focus-visible,
+    .app-main > aside.panel:not(.panel-right) input:focus-visible,
+    .app-main > aside.panel:not(.panel-right) select:focus-visible {
+      outline: 2px solid rgba(255, 109, 31, 0.45);
+      outline-offset: 2px;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Right sidebar: match DisplayKit main *right* properties sidebar          */
+    /* ---------------------------------------------------------------------- */
+
+    .app-main > aside.panel.panel-right {
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border-color);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    /* Property sidebar sections are not "cards" — they're grouped rows */
+    .app-main > aside.panel.panel-right .panel-section {
+      padding: 0 0 10px 0;
+      margin: 0 0 10px 0;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .app-main > aside.panel.panel-right .panel-section:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-bottom: 0;
+    }
+
+    .app-main > aside.panel.panel-right .panel-section:hover {
+      box-shadow: none;
+    }
+
+    /* DisplayKit-like section title */
+    .app-main > aside.panel.panel-right .panel-section > h2 {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.10em;
+      color: var(--btn-primary);
+      margin: 10px 0 6px 0;
+      padding: 6px 10px;
+      border-radius: 12px;
+      border: 2px solid rgba(255, 109, 31, 0.22);
+      background: linear-gradient(
+        135deg,
+        rgba(255, 109, 31, 0.12),
+        rgba(255, 109, 31, 0.04)
+      );
+      box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.14),
+        0 0 0 1px rgba(255, 109, 31, 0.10);
+    }
+
+    /* Make the timeline area behave like a resizable-ish block inside a flex column */
+    .app-main > aside.panel.panel-right .timeline-container {
+      height: auto;
+      flex: 1 1 360px; /* take more space in the right sidebar */
+      min-height: 360px; /* bigger timeline by default */
+    }
+
+    /* Right sidebar: nicer content grouping (timeline strip + textareas) */
+    .timeline-strip {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 8px;
+      scroll-snap-type: x proximity;
+    }
+    .frame-thumb {
+      scroll-snap-align: start;
+    }
+
+    /* Make timeline strip feel like a contained widget */
+    .timeline-container .timeline-strip {
+      min-height: 120px;
+      align-items: flex-start;
+    }
+
+    /* Improve export/import textarea feel (more like DisplayKit code box) */
+    textarea.export-output {
+      line-height: 1.45;
+      border-radius: 12px;
+    }
+
+    /* Reduce visual noise on pills/badges */
+    .badge,
+    .pill {
+      border-radius: 999px;
+    }
+
+    /* More compact hint spacing */
+    .panel .hint {
+      margin: 8px 0 0 0;
+    }
+
+    /* Make right panel controls a bit tighter */
+    .app-main > aside.panel.panel-right .button-row {
+      margin-top: 6px;
+      gap: 8px;
+    }
+
+    .app-main > aside.panel.panel-right .toggle-row {
+      margin-top: 6px;
+    }
+
+    /* Ensure timeline container can shrink/grow nicely in the right sidebar */
+    .app-main > aside.panel.panel-right .timeline-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Make timeline thumbs pop a bit more (like selectable items) */
+    .frame-thumb {
+      border-radius: 12px;
+    }
+
+    .playback-controls {
+      border-radius: 14px;
+    }
+
+    /* Avoid inline style clash on play status */
+    #playStatus {
+      color: var(--text-secondary) !important;
+    }
+
+    /* Code snippets inside hints */
+    .panel code {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1px 6px;
+      font-size: 11px;
+      color: var(--text-primary);
+    }
+
+    label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      display: block;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    input[type="number"],
+    input[type="text"],
+    select {
+      background: var(--input-bg);
+      border-radius: 6px;
+      border: 1px solid var(--input-border);
+      padding: 6px 8px;
+      color: var(--text-primary);
+      font-size: 12px;
+      width: 100%;
+      outline: none;
+    }
+
+    input[type="number"]:focus,
+    input[type="text"]:focus,
+    select:focus {
+      border-color: var(--btn-primary);
+      box-shadow: 0 0 0 2px var(--glow-primary);
+    }
+
+    button {
+      border-radius: 6px;
+      border: 1px solid var(--btn-secondary-border);
+      background: var(--btn-secondary);
+      color: var(--text-primary);
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.12s ease, border-color 0.12s ease,
+        transform 0.08s ease;
+    }
+
+    button:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--border-color);
+      transform: translateY(-0.5px);
+    }
+
+    button.primary {
+      background: var(--btn-primary);
+      border-color: var(--btn-primary);
+      color: white;
+    }
+
+    button.primary:hover {
+      background: var(--btn-primary-hover);
+      border-color: var(--btn-primary-hover);
+      filter: none;
+    }
+
+    button.danger {
+      border-color: var(--btn-danger);
+      color: var(--btn-danger);
+    }
+
+    button.small {
+      padding: 4px 8px;
+      font-size: 10px;
+    }
+
+    button.full {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .pixel-stage-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden; /* CRITICAL: never let the grid paint over side panels */
+    }
+
+    .pixel-stage-header {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .pixel-stage-header span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pixel-stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, var(--bg-primary) 0, var(--bg-primary) 40%, var(--bg-secondary) 100%);
+      padding: 12px;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden; /* safety net */
+    }
+
+    .pixel-grid {
+      --cell: 12px; /* JS will adjust this to fit the available stage */
+      display: grid;
+      gap: 1px;
+      background: var(--bg-primary);
+      border-radius: 12px;
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--card-shadow);
+      user-select: none;
+      touch-action: none;
+      max-width: 100%;
+      max-height: 100%;
+      width: fit-content;
+      height: fit-content;
+    }
+
+    .pixel {
+      width: var(--cell);
+      height: var(--cell);
+      background: var(--bg-primary);
+      border-radius: 2px;
+      transition: background 0.04s ease;
+    }
+
+    .pixel.on {
+      background: var(--text-primary);
+    }
+
+    .pixel.onion {
+      background: rgba(128, 128, 128, 0.55); /* fallback */
+      opacity: 0.6;
+    }
+
+    .pixel.onion-2 {
+      background: rgba(128, 128, 128, 0.55); /* fallback */
+      opacity: 0.4;
+    }
+
+    .pixel.onion-3 {
+      background: rgba(128, 128, 128, 0.55); /* fallback */
+      opacity: 0.25;
+    }
+
+    .pixel.onion-all {
+      background: rgba(128, 128, 128, 0.55); /* fallback */
+      opacity: 0.15;
+    }
+
+    .pixel.preview {
+      background: rgba(255, 109, 31, 0.55); /* fallback */
+      opacity: 0.7;
+    }
+
+    @supports (background: color-mix(in srgb, black 50%, white)) {
+      .pixel.onion,
+      .pixel.onion-2,
+      .pixel.onion-3,
+      .pixel.onion-all {
+        background: color-mix(in srgb, var(--text-primary) 35%, var(--bg-primary));
+      }
+      .pixel.preview {
+        background: color-mix(in srgb, var(--btn-primary) 70%, var(--bg-primary));
+      }
+    }
+
+    .timeline-container {
+      height: 45%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .timeline-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+      scrollbar-width: thin;
+    }
+
+    .frame-thumb {
+      min-width: 56px;
+      max-width: 56px;
+      border-radius: 10px;
+      padding: 4px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      transition: border-color 0.1s, box-shadow 0.1s, transform 0.08s;
+    }
+
+    .frame-thumb.active {
+      border-color: var(--btn-primary);
+      box-shadow: 0 0 0 1px var(--glow-secondary);
+      transform: translateY(-1px);
+    }
+
+    .frame-thumb canvas {
+      width: 44px;
+      height: 44px;
+      image-rendering: pixelated;
+      border-radius: 6px;
+      background: var(--bg-primary);
+    }
+
+    .frame-thumb-label {
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .timeline-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .playback-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--bg-primary) 90%, transparent), color-mix(in srgb, var(--bg-secondary) 80%, transparent));
+      border: 1px solid var(--border-color);
+    }
+
+    .playback-controls > div {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    input[type="range"] {
+      width: 100px;
+    }
+
+    .export-output {
+      width: 100%;
+      min-height: 180px;
+      background: var(--input-bg);
+      border-radius: 10px;
+      border: 1px solid var(--input-border);
+      padding: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      color: var(--text-primary);
+      resize: vertical;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      accent-color: #FF6D1F;
+    }
+
+    .pill {
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      font-size: 10px;
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+    }
+
+    .small-note {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+
+    @media (max-width: 1024px) {
+      .app-main {
+        grid-template-columns: 300px minmax(0, 1fr) 300px;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .app-main {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto auto;
+      }
+
+      .panel {
+        border-right: none;
+        border-bottom: 1px solid #111827;
+      }
+
+      .panel-right {
+        border-left: none;
+      }
+
+      .pixel-stage-container {
+        height: 420px;
+      }
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Embedded mode + light theme (to match DisplayKit)                       */
+    /* ---------------------------------------------------------------------- */
+
+    body.bc-embed .app-header-right {
+      display: none;
+    }
+
+    body.bc-embed .app-title {
+      letter-spacing: 0.02em;
+    }
+
+    /* Avoid duplicated header (DisplayKit overlay already shows tool name) */
+    body.bc-embed .app-header {
+      display: none;
+    }
+    /* Keep BitCanvas' Tools bar layout, but let theme colors come from tools/theme.css */
+    .dk-tools-card {
+      margin: 10px 16px 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="dk-tools-card" id="dkToolsCard">
+    <div class="dk-tools-title">Tools</div>
+    <div class="dk-tools-links">
+      <a class="dk-tool-link" href="../pixelforge/index.html">🧩 PixelForge</a>
+      <a class="dk-tool-link active" href="../bitcanvas-studio/index.html">🎞️ BitCanvas</a>
+      <a class="dk-tool-link" href="../../index.html">↩ DisplayKit</a>
+    </div>
+  </div>
+
+  <header class="app-header">
+    <div>
+      <div class="app-title">BitCanvas Studio</div>
+      <div class="app-subtitle">
+        Mesmerizing pixel animations · OLED / U8g2 / SSD1306 ready
+      </div>
+    </div>
+    <div class="app-header-right">
+      <div class="badge">Web-based Tool</div>
+      <div>Export → Arduino C arrays · JSON</div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- LEFT: Controls -->
+    <aside class="panel">
+      <div class="panel-section">
+        <h2>Display Setup</h2>
+        <label>Resolution (px)</label>
+        <div class="field-row">
+          <div style="flex: 1">
+            <input type="number" id="widthInput" min="4" max="256" value="64" />
+            <div class="small-note">Width</div>
+          </div>
+          <div style="flex: 1">
+            <input
+              type="number"
+              id="heightInput"
+              min="4"
+              max="128"
+              value="64"
+            />
+            <div class="small-note">Height</div>
+          </div>
+        </div>
+        <div class="button-row">
+          <button id="applySizeBtn" class="small primary">Apply Size</button>
+          <button
+            class="small"
+            data-preset="128x64"
+            onclick="setPreset(128,64)"
+          >
+            128×64
+          </button>
+          <button
+            class="small"
+            data-preset="128x32"
+            onclick="setPreset(128,32)"
+          >
+            128×32
+          </button>
+          <button
+            class="small"
+            data-preset="64x48"
+            onclick="setPreset(64,48)"
+          >
+            64×48
+          </button>
+        </div>
+        <p class="hint">
+          Big grids (128×64) are heavier but fine for PC. For smoother UX while
+          sketching, you can work smaller and upscale in code.
+        </p>
+      </div>
+
+      <div class="panel-section">
+        <h2>Frame Tools</h2>
+        <div class="button-row">
+          <button id="newFrameBtn" class="small">
+            + New Frame
+          </button>
+          <button id="duplicateFrameBtn" class="small">
+            ⧉ Duplicate
+          </button>
+          <button id="deleteFrameBtn" class="small danger">
+            ✕ Delete
+          </button>
+        </div>
+        <div class="button-row" style="margin-top: 8px">
+          <button id="clearFrameBtn" class="small">Clear</button>
+          <button id="invertFrameBtn" class="small">Invert</button>
+        </div>
+        <label style="margin-top: 10px">Shift Frame</label>
+        <div class="button-row">
+          <button id="shiftUpBtn" class="small">↑</button>
+          <button id="shiftDownBtn" class="small">↓</button>
+          <button id="shiftLeftBtn" class="small">←</button>
+          <button id="shiftRightBtn" class="small">→</button>
+        </div>
+
+        <label style="margin-top: 10px">Generative</label>
+        <div class="button-row">
+          <button id="sparklesBtn" class="small">
+            ✴ Sparkles
+          </button>
+          <button id="randomNoiseBtn" class="small">
+            ▦ Noise
+          </button>
+        </div>
+
+        <div class="toggle-row">
+          <input type="checkbox" id="onionSkinToggle" />
+          <span>Onion-skin previous frames</span>
+        </div>
+        <label>Onion-skin depth</label>
+        <select id="onionSkinDepth">
+          <option value="1">1 frame</option>
+          <option value="2">2 frames</option>
+          <option value="3">3 frames</option>
+          <option value="all">All frames</option>
+        </select>
+        <div class="toggle-row">
+          <input type="checkbox" id="onionSkinAllToggle" />
+          <span>Show all frames overlay</span>
+        </div>
+        <div class="toggle-row">
+          <input type="checkbox" id="autoAnimateToggle" />
+          <span>Auto-play on first draw</span>
+        </div>
+        <label>Animation Frames</label>
+        <input type="number" id="animationFramesInput" min="4" max="50" value="12" />
+      </div>
+
+      <div class="panel-section">
+        <h2>Drawing Tools</h2>
+        <label>Tool</label>
+        <div class="bc-tool-grid" aria-label="Drawing tools">
+          <button id="toolPencilBtn" class="small primary bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">✏</span>
+            <span class="bc-tool-label">Pencil</span>
+          </button>
+          <button id="toolBrushBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">🖌</span>
+            <span class="bc-tool-label">Brush</span>
+          </button>
+          <button id="toolEraserBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">🧽</span>
+            <span class="bc-tool-label">Eraser</span>
+          </button>
+
+          <button id="toolLineBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">📏</span>
+            <span class="bc-tool-label">Line</span>
+          </button>
+          <button id="toolRectBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">▭</span>
+            <span class="bc-tool-label">Rect</span>
+          </button>
+          <button id="toolCircleBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">○</span>
+            <span class="bc-tool-label">Circle</span>
+          </button>
+
+          <button id="toolFillBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">🪣</span>
+            <span class="bc-tool-label">Fill</span>
+          </button>
+          <button id="toolSelectBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">✂</span>
+            <span class="bc-tool-label">Select</span>
+          </button>
+          <button id="toolSymmetryBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">🔄</span>
+            <span class="bc-tool-label">Symmetry</span>
+          </button>
+
+          <button id="toolSprayBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">💨</span>
+            <span class="bc-tool-label">Spray</span>
+          </button>
+          <button id="toolGradientBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">🌈</span>
+            <span class="bc-tool-label">Gradient</span>
+          </button>
+          <button id="toolPatternBtn" class="small bc-tool-tile" type="button">
+            <span class="bc-tool-icon" aria-hidden="true">🔲</span>
+            <span class="bc-tool-label">Pattern</span>
+          </button>
+        </div>
+
+        <div class="button-row" style="margin-top: 8px">
+          <button id="undoBtn" class="small" title="Undo (Ctrl+Z)">↶ Undo</button>
+          <button id="redoBtn" class="small" title="Redo (Ctrl+Y)">↷ Redo</button>
+          <button id="clearHistoryBtn" class="small danger" title="Clear History">🗑 Clear</button>
+        </div>
+
+        <label style="margin-top: 10px">Brush Size</label>
+        <input type="range" id="brushSizeSlider" min="1" max="5" value="1" />
+        <div class="small-note" id="brushSizeLabel">Size: 1</div>
+
+        <div class="toggle-row" style="margin-top: 8px">
+          <input type="checkbox" id="symmetryHToggle" />
+          <span>Horizontal symmetry</span>
+        </div>
+        <div class="toggle-row">
+          <input type="checkbox" id="symmetryVToggle" />
+          <span>Vertical symmetry</span>
+        </div>
+
+        <p class="hint">
+          <strong>Pencil:</strong> Click & drag to paint pixels<br>
+          <strong>Brush:</strong> Larger circular brush<br>
+          <strong>Line/Rect/Circle:</strong> Click start, drag to end<br>
+          <strong>Fill:</strong> Click area to fill<br>
+          <strong>Select:</strong> Select area, then draw within<br>
+          <strong>Symmetry:</strong> Mirror drawing across axes
+        </p>
+      </div>
+    </aside>
+
+    <!-- CENTER: Pixel editor -->
+    <section class="pixel-stage-container">
+      <div class="pixel-stage-header">
+        <span>
+          <span>Frame:</span>
+          <strong id="frameInfo">1 / 1</strong>
+        </span>
+        <span>
+          <span>Resolution:</span>
+          <strong id="resolutionInfo">64×64</strong>
+        </span>
+      </div>
+      <div class="pixel-stage" id="pixelStage">
+        <div id="pixelGrid" class="pixel-grid"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Timeline & export -->
+    <aside class="panel panel-right">
+      <div class="panel-section timeline-container">
+        <h2>Timeline</h2>
+        <div id="timelineStrip" class="timeline-strip"></div>
+
+        <div class="timeline-controls">
+          <button id="moveFrameLeftBtn" class="small">← Move</button>
+          <button id="moveFrameRightBtn" class="small">Move →</button>
+          <button id="reverseFramesBtn" class="small">Reverse</button>
+        </div>
+
+        <div class="playback-controls">
+          <div>
+            <button id="playPauseBtn" class="small primary">▶ Play</button>
+            <span id="playStatus" style="color: #9ca3af">Idle</span>
+          </div>
+          <div>
+            <span>FPS</span>
+            <input
+              type="range"
+              id="fpsRange"
+              min="1"
+              max="24"
+              value="8"
+            />
+            <span id="fpsLabel">8</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h2>Import Bitmap</h2>
+        <label>Upload image (PNG/JPG)</label>
+        <input type="file" id="importImageInput" accept="image/*" />
+        <div class="toggle-row">
+          <input type="checkbox" id="importInvertToggle" />
+          <span>Invert</span>
+        </div>
+        <label>Threshold</label>
+        <input type="range" id="importThreshold" min="0" max="255" value="128" />
+        <div class="small-note" id="importThresholdLabel">128</div>
+        <div class="toggle-row">
+          <input type="checkbox" id="importAsNewFrameToggle" />
+          <span>Import as new frame</span>
+        </div>
+        <p class="hint">
+          Image will be scaled to your current resolution (<span id="importResHint">64×64</span>) and converted to 1‑bit.
+        </p>
+
+        <label style="margin-top: 8px">Paste C hex bitmap (optional)</label>
+        <textarea
+          id="importCText"
+          class="export-output"
+          style="min-height: 120px"
+          spellcheck="false"
+          placeholder="Paste something like: { 0x00, 0xFF, ... }"
+        ></textarea>
+        <div class="button-row" style="margin-top: 6px">
+          <button id="importCBtn" class="small full">⬇ Import C Bitmap</button>
+        </div>
+        <p class="hint">
+          Assumes the bytes are row-major, 8 horizontal pixels per byte, MSB=left (same as this tool’s export).
+        </p>
+      </div>
+
+      <div class="panel-section">
+        <h2>Export</h2>
+        <label>Symbol prefix</label>
+        <input
+          type="text"
+          id="symbolPrefix"
+          value="oledAnim"
+          placeholder="oledAnim"
+        />
+
+        <label style="margin-top: 8px">Export Format</label>
+        <div class="button-row">
+          <button id="exportCBtn" class="small primary full">
+            C / C++ Arrays (Arduino)
+          </button>
+          <button id="exportJsonBtn" class="small full">
+            JSON (raw frames)
+          </button>
+        </div>
+
+        <textarea
+          id="exportOutput"
+          class="export-output"
+          spellcheck="false"
+          placeholder="// Export will appear here…"
+        ></textarea>
+
+        <div class="button-row" style="margin-top: 6px">
+          <button id="copyExportBtn" class="small full">
+            📋 Copy to Clipboard
+          </button>
+        </div>
+
+        <p class="hint">
+          C arrays use a row-major 1-bit bitmap (8 horizontal pixels per byte).
+          Plug into <code>display.drawBitmap()</code> (Adafruit GFX / U8g2
+          compatible).
+        </p>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    // --- Embed/theme bridging -------------------------------------------------
+    const __params = new URLSearchParams(window.location.search);
+    const __isEmbed = __params.get("embed") === "1";
+    const __initialTheme = __params.get("theme"); // "dark" | "light"
+
+    function applyHostTheme(theme) {
+      const t = theme === "light" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", t);
+      // Back-compat class hooks (some older CSS/embeds might rely on these)
+      document.body.classList.toggle("bc-light", t === "light");
+      document.body.classList.toggle("bc-dark", t === "dark");
+    }
+
+    if (__isEmbed) {
+      document.body.classList.add("bc-embed");
+    }
+    const __savedTheme = __initialTheme || localStorage.getItem("theme") || localStorage.getItem("mode") || "dark";
+    applyHostTheme(__savedTheme);
+
+    // Hide neon Tools card when embedded inside DisplayKit (overlay already has switcher)
+    if (__isEmbed) {
+      const dkTools = document.getElementById("dkToolsCard");
+      if (dkTools) dkTools.style.display = "none";
+    }
+
+    window.addEventListener("message", (event) => {
+      const data = event && event.data;
+      if (data && data.type === "requestExport") {
+        const out = document.getElementById("exportOutput")?.value || "";
+        window.parent?.postMessage({ type: "toolExport", tool: "bitcanvas", text: out }, "*");
+        return;
+      }
+      if (!data || data.type !== "displaykitTheme") return;
+      applyHostTheme(data.theme);
+    });
+
+    // --- Core state -----------------------------------------------------------
+    let gridWidth = 64;
+    let gridHeight = 64;
+    let frames = [];
+    let currentFrameIndex = 0;
+    let isPlaying = false;
+    let playTimer = null;
+    let currentTool = "pencil"; // "pencil" | "brush" | "eraser" | "line" | "rect" | "circle" | "fill" | "select" | "spray" | "gradient" | "pattern"
+    let brushSize = 1;
+    let undoHistory = [];
+    let redoHistory = [];
+    const MAX_HISTORY = 50;
+    let isDrawing = false;
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let isMouseDown = false;
+    let lastToggleState = null;
+    let onionSkinEnabled = false;
+    let onionSkinDepth = 1; // 1, 2, 3, or "all"
+    let onionSkinAllFrames = false;
+    let autoAnimateEnabled = false;
+    let animationFrameCount = 12;
+    let symmetryHEnabled = false;
+    let symmetryVEnabled = false;
+    let selectionStart = null;
+    let selectionEnd = null;
+    let isSelecting = false;
+
+    const pixelGridEl = document.getElementById("pixelGrid");
+    const pixelStageEl = document.getElementById("pixelStage");
+    const timelineStripEl = document.getElementById("timelineStrip");
+    const frameInfoEl = document.getElementById("frameInfo");
+    const resolutionInfoEl = document.getElementById("resolutionInfo");
+    const fpsRangeEl = document.getElementById("fpsRange");
+    const fpsLabelEl = document.getElementById("fpsLabel");
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const playStatusEl = document.getElementById("playStatus");
+    const exportOutputEl = document.getElementById("exportOutput");
+    const importImageInputEl = document.getElementById("importImageInput");
+    const importInvertToggleEl = document.getElementById("importInvertToggle");
+    const importThresholdEl = document.getElementById("importThreshold");
+    const importThresholdLabelEl = document.getElementById("importThresholdLabel");
+    const importAsNewFrameToggleEl = document.getElementById("importAsNewFrameToggle");
+    const importResHintEl = document.getElementById("importResHint");
+    const importCTextEl = document.getElementById("importCText");
+
+    let gridEventsBound = false;
+
+    function fitPixelGridToStage() {
+      if (!pixelStageEl || !pixelGridEl) return;
+
+      // Measure available space inside the stage (accounts for CSS padding)
+      const stageStyle = getComputedStyle(pixelStageEl);
+      const stagePadX =
+        parseFloat(stageStyle.paddingLeft) + parseFloat(stageStyle.paddingRight);
+      const stagePadY =
+        parseFloat(stageStyle.paddingTop) + parseFloat(stageStyle.paddingBottom);
+
+      const availW = Math.max(50, pixelStageEl.clientWidth - stagePadX);
+      const availH = Math.max(50, pixelStageEl.clientHeight - stagePadY);
+
+      // Account for grid padding + border + gaps between cells
+      const gridStyle = getComputedStyle(pixelGridEl);
+      const gridPadX =
+        parseFloat(gridStyle.paddingLeft) +
+        parseFloat(gridStyle.paddingRight) +
+        parseFloat(gridStyle.borderLeftWidth) +
+        parseFloat(gridStyle.borderRightWidth);
+      const gridPadY =
+        parseFloat(gridStyle.paddingTop) +
+        parseFloat(gridStyle.paddingBottom) +
+        parseFloat(gridStyle.borderTopWidth) +
+        parseFloat(gridStyle.borderBottomWidth);
+
+      const gap = 1; // must match CSS .pixel-grid { gap: 1px; }
+      const usableW = Math.max(10, availW - gridPadX - (gridWidth - 1) * gap);
+      const usableH = Math.max(10, availH - gridPadY - (gridHeight - 1) * gap);
+
+      // Pick the largest integer cell size that fits both dimensions
+      let cell = Math.floor(Math.min(usableW / gridWidth, usableH / gridHeight));
+      cell = Math.max(2, Math.min(20, cell)); // clamp so it's usable
+
+      pixelGridEl.style.setProperty("--cell", `${cell}px`);
+
+      // Ensure templates use the (new) cell size
+      pixelGridEl.style.gridTemplateColumns = `repeat(${gridWidth}, var(--cell))`;
+      pixelGridEl.style.gridTemplateRows = `repeat(${gridHeight}, var(--cell))`;
+    }
+
+    function updateImportResHint() {
+      if (importResHintEl) importResHintEl.textContent = `${gridWidth}×${gridHeight}`;
+    }
+
+    function cloneFrame(frame) {
+      return frame.map((row) => row.slice());
+    }
+
+    function loadFrameIntoCurrent(targetFrame) {
+      frames[currentFrameIndex] = targetFrame;
+      renderFrame();
+    }
+
+    function importFrame(targetFrame) {
+      const asNew = !!(importAsNewFrameToggleEl && importAsNewFrameToggleEl.checked);
+      if (asNew) {
+        frames.splice(currentFrameIndex + 1, 0, targetFrame);
+        currentFrameIndex++;
+        renderFrame();
+      } else {
+        loadFrameIntoCurrent(targetFrame);
+      }
+    }
+
+    function imageToFrame(img, threshold, invert) {
+      const c = document.createElement("canvas");
+      c.width = gridWidth;
+      c.height = gridHeight;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+
+      // draw scaled to fit exactly the grid resolution
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      const data = ctx.getImageData(0, 0, c.width, c.height).data;
+
+      const frame = createEmptyFrame();
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          const idx = (y * gridWidth + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const a = data[idx + 3] / 255;
+
+          // luminance; treat transparent as white background
+          const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) * a + 255 * (1 - a);
+          let on = lum < threshold; // darker => on
+          if (invert) on = !on;
+          frame[y][x] = on;
+        }
+      }
+      return frame;
+    }
+
+    function parseHexBytes(text) {
+      // Accept: 0x00, 0XFF, 255, etc. We mainly target 0x.. tokens.
+      const tokens = text.match(/0x[0-9a-fA-F]+|\b\d+\b/g) || [];
+      const bytes = [];
+      for (const t of tokens) {
+        let v;
+        if (t.toLowerCase().startsWith("0x")) v = parseInt(t, 16);
+        else v = parseInt(t, 10);
+        if (!Number.isFinite(v)) continue;
+        bytes.push(v & 0xff);
+      }
+      return bytes;
+    }
+
+    function cBytesToFrame(bytes, w, h) {
+      const frame = [];
+      for (let y = 0; y < h; y++) {
+        frame.push(new Array(w).fill(false));
+      }
+      const bytesPerRow = Math.ceil(w / 8);
+      const expected = bytesPerRow * h;
+      if (bytes.length < expected) {
+        throw new Error(`Not enough bytes. Need ${expected}, got ${bytes.length}.`);
+      }
+      let offset = 0;
+      for (let y = 0; y < h; y++) {
+        for (let bx = 0; bx < bytesPerRow; bx++) {
+          const b = bytes[offset++];
+          for (let bit = 0; bit < 8; bit++) {
+            const x = bx * 8 + bit;
+            if (x >= w) continue;
+            const mask = 1 << (7 - bit); // MSB=left
+            frame[y][x] = (b & mask) !== 0;
+          }
+        }
+      }
+      return frame;
+    }
+
+    function createEmptyFrame() {
+      const frame = [];
+      for (let y = 0; y < gridHeight; y++) {
+        const row = new Array(gridWidth).fill(false);
+        frame.push(row);
+      }
+      return frame;
+    }
+
+    function ensureFrameShape(frame) {
+      // If resolution changed, adapt existing frame to new size (crop/pad)
+      const newFrame = [];
+      for (let y = 0; y < gridHeight; y++) {
+        const row = [];
+        for (let x = 0; x < gridWidth; x++) {
+          if (frame[y] && typeof frame[y][x] !== "undefined") {
+            row.push(frame[y][x]);
+          } else {
+            row.push(false);
+          }
+        }
+        newFrame.push(row);
+      }
+      return newFrame;
+    }
+
+    function rebuildAllFramesForNewSize() {
+      frames = frames.map((f) => ensureFrameShape(f));
+    }
+
+    // --- Grid building & rendering -------------------------------------------
+    function buildPixelGrid() {
+      pixelGridEl.innerHTML = "";
+      // Use fixed cell sizing (fitPixelGridToStage controls --cell)
+      pixelGridEl.style.gridTemplateColumns = `repeat(${gridWidth}, var(--cell))`;
+      pixelGridEl.style.gridTemplateRows = `repeat(${gridHeight}, var(--cell))`;
+
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          const div = document.createElement("div");
+          div.className = "pixel";
+          div.dataset.x = x;
+          div.dataset.y = y;
+          pixelGridEl.appendChild(div);
+        }
+      }
+
+      // Bind input handlers once; buildPixelGrid() is called on every resize/preset.
+      if (!gridEventsBound) {
+        pixelGridEl.addEventListener("mousedown", handleGridMouseDown);
+        pixelGridEl.addEventListener("mousemove", handleGridMouseMove);
+        window.addEventListener("mouseup", handleGridMouseUp);
+        pixelGridEl.addEventListener("mouseleave", handleGridMouseLeave);
+        pixelGridEl.addEventListener(
+          "contextmenu",
+          (e) => e.preventDefault(),
+          false
+        );
+        gridEventsBound = true;
+      }
+
+      fitPixelGridToStage();
+    }
+
+    function renderFrame() {
+      const frame = frames[currentFrameIndex];
+
+      // Collect onion skin frames
+      const onionFrames = [];
+      if (onionSkinEnabled && !onionSkinAllFrames) {
+        // Show specified number of previous frames
+        const depth = onionSkinDepth === "all" ? frames.length : parseInt(onionSkinDepth);
+        for (let i = 1; i <= depth && currentFrameIndex - i >= 0; i++) {
+          onionFrames.push({
+            frame: frames[currentFrameIndex - i],
+            level: i
+          });
+        }
+      } else if (onionSkinAllFrames) {
+        // Show all frames except current one
+        for (let i = 0; i < frames.length; i++) {
+          if (i !== currentFrameIndex) {
+            onionFrames.push({
+              frame: frames[i],
+              level: "all"
+            });
+          }
+        }
+      }
+
+      const pixels = pixelGridEl.children;
+      let i = 0;
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          const div = pixels[i++];
+          div.classList.remove("on", "onion", "onion-2", "onion-3", "onion-all", "preview");
+
+          if (frame[y][x]) {
+            div.classList.add("on");
+          } else {
+            // Check onion skin frames in reverse order (closest first)
+            let onionClass = null;
+            for (let j = onionFrames.length - 1; j >= 0; j--) {
+              const onionFrame = onionFrames[j];
+              if (onionFrame.frame[y][x]) {
+                if (onionFrame.level === "all") {
+                  onionClass = "onion-all";
+                } else if (onionFrame.level === 1) {
+                  onionClass = "onion";
+                } else if (onionFrame.level === 2) {
+                  onionClass = "onion-2";
+                } else if (onionFrame.level >= 3) {
+                  onionClass = "onion-3";
+                }
+                break; // Use the first (closest) frame that has a pixel here
+              }
+            }
+            if (onionClass) {
+              div.classList.add(onionClass);
+            }
+          }
+        }
+      }
+
+      frameInfoEl.textContent = `${currentFrameIndex + 1} / ${frames.length}`;
+      resolutionInfoEl.textContent = `${gridWidth}×${gridHeight}`;
+      updateImportResHint();
+
+      renderTimeline();
+    }
+
+    // --- Advanced Drawing Tools --------------------------------------------------
+
+    function drawPixel(frame, x, y, value = true) {
+      if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
+        frame[y][x] = value;
+      }
+    }
+
+    function drawLine(frame, x0, y0, x1, y1, value = true) {
+      const dx = Math.abs(x1 - x0);
+      const dy = Math.abs(y1 - y0);
+      const sx = x0 < x1 ? 1 : -1;
+      const sy = y0 < y1 ? 1 : -1;
+      let err = dx - dy;
+
+      while (true) {
+        drawPixel(frame, x0, y0, value);
+
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 > -dy) {
+          err -= dy;
+          x0 += sx;
+        }
+        if (e2 < dx) {
+          err += dx;
+          y0 += sy;
+        }
+      }
+    }
+
+    function drawRectangle(frame, x0, y0, x1, y1, value = true, filled = true) {
+      const minX = Math.min(x0, x1);
+      const maxX = Math.max(x0, x1);
+      const minY = Math.min(y0, y1);
+      const maxY = Math.max(y0, y1);
+
+      if (filled) {
+        for (let y = minY; y <= maxY; y++) {
+          for (let x = minX; x <= maxX; x++) {
+            drawPixel(frame, x, y, value);
+            applySymmetry(frame, x, y, value);
+          }
+        }
+      } else {
+        // Draw outline
+        for (let x = minX; x <= maxX; x++) {
+          drawPixel(frame, x, minY, value);
+          drawPixel(frame, x, maxY, value);
+          applySymmetry(frame, x, minY, value);
+          applySymmetry(frame, x, maxY, value);
+        }
+        for (let y = minY + 1; y < maxY; y++) {
+          drawPixel(frame, minX, y, value);
+          drawPixel(frame, maxX, y, value);
+          applySymmetry(frame, minX, y, value);
+          applySymmetry(frame, maxX, y, value);
+        }
+      }
+    }
+
+    function drawCircle(frame, centerX, centerY, radius, value = true, filled = true) {
+      const radiusSquared = radius * radius;
+
+      for (let y = Math.max(0, centerY - radius); y <= Math.min(gridHeight - 1, centerY + radius); y++) {
+        for (let x = Math.max(0, centerX - radius); x <= Math.min(gridWidth - 1, centerX + radius); x++) {
+          const distanceSquared = (x - centerX) ** 2 + (y - centerY) ** 2;
+
+          if (filled) {
+            if (distanceSquared <= radiusSquared) {
+              drawPixel(frame, x, y, value);
+              applySymmetry(frame, x, y, value);
+            }
+          } else {
+            // Draw outline - check if pixel is on the circle boundary
+            if (distanceSquared >= radiusSquared - radius && distanceSquared <= radiusSquared + radius) {
+              drawPixel(frame, x, y, value);
+              applySymmetry(frame, x, y, value);
+            }
+          }
+        }
+      }
+    }
+
+    function drawCircle(frame, centerX, centerY, radius, value = true, filled = true) {
+      const r = Math.abs(radius);
+      let x = r;
+      let y = 0;
+      let err = 0;
+
+      while (x >= y) {
+        if (filled) {
+          // Fill horizontal lines for filled circle
+          for (let i = centerX - x; i <= centerX + x; i++) {
+            drawPixel(frame, i, centerY + y, value);
+            drawPixel(frame, i, centerY - y, value);
+          }
+          for (let i = centerX - y; i <= centerX + y; i++) {
+            drawPixel(frame, i, centerY + x, value);
+            drawPixel(frame, i, centerY - x, value);
+          }
+        } else {
+          // Draw outline points
+          drawPixel(frame, centerX + x, centerY + y, value);
+          drawPixel(frame, centerX + y, centerY + x, value);
+          drawPixel(frame, centerX - y, centerY + x, value);
+          drawPixel(frame, centerX - x, centerY + y, value);
+          drawPixel(frame, centerX - x, centerY - y, value);
+          drawPixel(frame, centerX - y, centerY - x, value);
+          drawPixel(frame, centerX + y, centerY - x, value);
+          drawPixel(frame, centerX + x, centerY - y, value);
+        }
+
+        y += 1;
+        err += 1 + 2 * y;
+        if (2 * (err - x) + 1 > 0) {
+          x -= 1;
+          err += 1 - 2 * x;
+        }
+      }
+    }
+
+    function floodFill(frame, startX, startY, newValue) {
+      const targetValue = frame[startY][startX];
+      if (targetValue === newValue) return;
+
+      const stack = [[startX, startY]];
+
+      while (stack.length > 0) {
+        const [x, y] = stack.pop();
+
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) continue;
+        if (frame[y][x] !== targetValue) continue;
+
+        frame[y][x] = newValue;
+
+        stack.push([x + 1, y]);
+        stack.push([x - 1, y]);
+        stack.push([x, y + 1]);
+        stack.push([x, y - 1]);
+      }
+    }
+
+    function drawBrush(frame, centerX, centerY, value = true) {
+      const radius = Math.floor(brushSize / 2);
+
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance <= radius) {
+            drawPixel(frame, centerX + dx, centerY + dy, value);
+          }
+        }
+      }
+    }
+
+    function applySymmetry(frame, x, y, value = true) {
+      // Draw at original position
+      drawPixel(frame, x, y, value);
+
+      // Apply horizontal symmetry
+      if (symmetryHEnabled) {
+        const symmetricX = gridWidth - 1 - x;
+        drawPixel(frame, symmetricX, y, value);
+      }
+
+      // Apply vertical symmetry
+      if (symmetryVEnabled) {
+        const symmetricY = gridHeight - 1 - y;
+        drawPixel(frame, x, symmetricY, value);
+
+        // Apply both if both symmetries enabled
+        if (symmetryHEnabled) {
+          const symmetricX = gridWidth - 1 - x;
+          drawPixel(frame, symmetricX, symmetricY, value);
+        }
+      }
+    }
+
+    // --- Undo/Redo System --------------------------------------------------
+    function saveToHistory() {
+      const frameCopy = frames[currentFrameIndex].map(row => row.slice());
+      undoHistory.push(frameCopy);
+      if (undoHistory.length > MAX_HISTORY) {
+        undoHistory.shift();
+      }
+      redoHistory = []; // Clear redo history when new action is performed
+      updateUndoRedoButtons();
+    }
+
+    function undo() {
+      if (undoHistory.length > 0) {
+        const currentState = frames[currentFrameIndex].map(row => row.slice());
+        redoHistory.push(currentState);
+
+        const previousState = undoHistory.pop();
+        frames[currentFrameIndex] = previousState;
+        renderFrame();
+        updateUndoRedoButtons();
+      }
+    }
+
+    function redo() {
+      if (redoHistory.length > 0) {
+        const currentState = frames[currentFrameIndex].map(row => row.slice());
+        undoHistory.push(currentState);
+
+        const nextState = redoHistory.pop();
+        frames[currentFrameIndex] = nextState;
+        renderFrame();
+        updateUndoRedoButtons();
+      }
+    }
+
+    function clearHistory() {
+      undoHistory = [];
+      redoHistory = [];
+      updateUndoRedoButtons();
+    }
+
+    function updateUndoRedoButtons() {
+      const undoBtn = document.getElementById("undoBtn");
+      const redoBtn = document.getElementById("redoBtn");
+
+      undoBtn.disabled = undoHistory.length === 0;
+      redoBtn.disabled = redoHistory.length === 0;
+
+      undoBtn.style.opacity = undoHistory.length === 0 ? "0.5" : "1";
+      redoBtn.style.opacity = redoHistory.length === 0 ? "0.5" : "1";
+    }
+
+    // --- Advanced Drawing Tools --------------------------------------------
+    function drawSpray(frame, centerX, centerY, radius = brushSize, density = 0.3) {
+      const value = currentTool === "eraser" ? false : true;
+      for (let y = centerY - radius; y <= centerY + radius; y++) {
+        for (let x = centerX - radius; x <= centerX + radius; x++) {
+          const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+          if (distance <= radius && Math.random() < density) {
+            drawPixel(frame, x, y, value);
+            applySymmetry(frame, x, y, value);
+          }
+        }
+      }
+    }
+
+    function drawGradient(frame, x0, y0, x1, y1) {
+      const minX = Math.min(x0, x1);
+      const maxX = Math.max(x0, x1);
+      const minY = Math.min(y0, y1);
+      const maxY = Math.max(y0, y1);
+
+      const width = maxX - minX + 1;
+      const height = maxY - minY + 1;
+
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          // Create gradient based on position
+          const gradientValue = ((x - minX) / width + (y - minY) / height) / 2;
+          const threshold = Math.random();
+          if (gradientValue > threshold) {
+            drawPixel(frame, x, y, true);
+            applySymmetry(frame, x, y, true);
+          }
+        }
+      }
+    }
+
+    function drawPattern(frame, x0, y0, x1, y1, pattern = "checker") {
+      const minX = Math.min(x0, x1);
+      const maxX = Math.max(x0, x1);
+      const minY = Math.min(y0, y1);
+      const maxY = Math.max(y0, y1);
+
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          let draw = false;
+
+          switch (pattern) {
+            case "checker":
+              draw = (x + y) % 2 === 0;
+              break;
+            case "stripes":
+              draw = y % 3 === 0;
+              break;
+            case "dots":
+              draw = (x % 3 === 1) && (y % 3 === 1);
+              break;
+            case "diagonal":
+              draw = (x + y) % 4 === 0;
+              break;
+          }
+
+          if (draw) {
+            drawPixel(frame, x, y, true);
+            applySymmetry(frame, x, y, true);
+          }
+        }
+      }
+    }
+
+    function floodFill(frame, startX, startY, newValue) {
+      const targetValue = frame[startY][startX];
+      if (targetValue === newValue) return;
+
+      const stack = [[startX, startY]];
+      const visited = new Set();
+
+      while (stack.length > 0) {
+        const [x, y] = stack.pop();
+        const key = `${x},${y}`;
+
+        if (visited.has(key)) continue;
+        visited.add(key);
+
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) continue;
+        if (frame[y][x] !== targetValue) continue;
+
+        frame[y][x] = newValue;
+        applySymmetry(frame, x, y, newValue);
+
+        // Add neighbors
+        stack.push([x + 1, y]);
+        stack.push([x - 1, y]);
+        stack.push([x, y + 1]);
+        stack.push([x, y - 1]);
+      }
+    }
+
+    function getPixelFromEvent(e) {
+      const target = e.target;
+      if (!target.classList.contains("pixel")) return null;
+      const x = parseInt(target.dataset.x, 10);
+      const y = parseInt(target.dataset.y, 10);
+      return { x, y, el: target };
+    }
+
+    function applyBrush(x, y, toggleIfNeeded) {
+      const frame = frames[currentFrameIndex];
+      if (!frame || !frame[y]) return;
+      if (toggleIfNeeded) {
+        frame[y][x] = !frame[y][x];
+      } else {
+        frame[y][x] = brushMode === "draw";
+      }
+    }
+
+    function hasPixelsDrawn(frame) {
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          if (frame[y][x]) return true;
+        }
+      }
+      return false;
+    }
+
+    function createRotatedFrame(originalFrame, angle) {
+      const newFrame = createEmptyFrame();
+      const centerX = Math.floor(gridWidth / 2);
+      const centerY = Math.floor(gridHeight / 2);
+
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          if (originalFrame[y][x]) {
+            // Translate to center
+            const dx = x - centerX;
+            const dy = y - centerY;
+
+            // Rotate
+            const rotatedX = Math.round(dx * cos - dy * sin);
+            const rotatedY = Math.round(dx * sin + dy * cos);
+
+            // Translate back
+            const finalX = rotatedX + centerX;
+            const finalY = rotatedY + centerY;
+
+            // Draw if within bounds
+            if (finalX >= 0 && finalX < gridWidth && finalY >= 0 && finalY < gridHeight) {
+              newFrame[finalY][finalX] = true;
+            }
+          }
+        }
+      }
+      return newFrame;
+    }
+
+    function createTranslatedFrame(originalFrame, offsetX, offsetY) {
+      const newFrame = createEmptyFrame();
+
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          if (originalFrame[y][x]) {
+            const newX = x + offsetX;
+            const newY = y + offsetY;
+            if (newX >= 0 && newX < gridWidth && newY >= 0 && newY < gridHeight) {
+              newFrame[newY][newX] = true;
+            }
+          }
+        }
+      }
+      return newFrame;
+    }
+
+    function createScaledFrame(originalFrame, scale) {
+      const newFrame = createEmptyFrame();
+      const centerX = Math.floor(gridWidth / 2);
+      const centerY = Math.floor(gridHeight / 2);
+
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          if (originalFrame[y][x]) {
+            // Translate to center
+            const dx = x - centerX;
+            const dy = y - centerY;
+
+            // Scale
+            const scaledX = Math.round(dx * scale);
+            const scaledY = Math.round(dy * scale);
+
+            // Translate back
+            const finalX = scaledX + centerX;
+            const finalY = scaledY + centerY;
+
+            // Draw if within bounds
+            if (finalX >= 0 && finalX < gridWidth && finalY >= 0 && finalY < gridHeight) {
+              newFrame[finalY][finalX] = true;
+            }
+          }
+        }
+      }
+      return newFrame;
+    }
+
+    function generateComplexAnimation(originalFrame, totalFrames) {
+      const animationFrames = [];
+
+      // Always start with the original frame
+      animationFrames.push(originalFrame.map(row => row.slice()));
+
+      if (totalFrames <= 1) return animationFrames;
+
+      // Calculate how many frames for each animation type
+      const remainingFrames = totalFrames - 1; // -1 for the original frame
+      const framesPerEffect = Math.max(1, Math.floor(remainingFrames / 3));
+      const extraFrames = remainingFrames % 3;
+
+      // Rotation frames
+      const rotationFrames = framesPerEffect + (extraFrames > 0 ? 1 : 0);
+      for (let i = 1; i <= rotationFrames; i++) {
+        const angle = (i * Math.PI * 2) / rotationFrames; // Full rotation cycle
+        animationFrames.push(createRotatedFrame(originalFrame, angle));
+      }
+
+      // Movement frames (bouncing)
+      const movementFrames = framesPerEffect + (extraFrames > 1 ? 1 : 0);
+      const bounceRange = Math.min(4, Math.floor(gridWidth / 8)); // Adaptive bounce range
+      for (let i = 0; i < movementFrames; i++) {
+        const angle = (i * Math.PI * 2) / movementFrames;
+        const offsetX = Math.round(Math.sin(angle) * bounceRange);
+        const offsetY = Math.round(Math.cos(angle) * bounceRange);
+        animationFrames.push(createTranslatedFrame(originalFrame, offsetX, offsetY));
+      }
+
+      // Scale frames (breathing effect)
+      const scaleFrames = framesPerEffect + (extraFrames > 2 ? 1 : 0);
+      for (let i = 0; i < scaleFrames; i++) {
+        const scale = 1 + 0.4 * Math.sin((i * Math.PI * 2) / scaleFrames); // Scale from 0.6 to 1.4
+        animationFrames.push(createScaledFrame(originalFrame, scale));
+      }
+
+      // Ensure we don't exceed the requested total frames
+      return animationFrames.slice(0, totalFrames);
+    }
+
+    function checkAutoAnimate() {
+      if (!autoAnimateEnabled) return;
+
+      // If we're on the first frame and it now has pixels drawn, create complex animation automatically
+      if (currentFrameIndex === 0 && hasPixelsDrawn(frames[0])) {
+        if (frames.length === 1) {
+          // Generate complex multi-frame animation
+          const animationFrames = generateComplexAnimation(frames[0], animationFrameCount);
+
+          // Replace frames with the new animation
+          frames.splice(0, frames.length, ...animationFrames);
+          currentFrameIndex = 0;
+
+          renderTimeline();
+          renderFrame();
+        }
+        if (!isPlaying) {
+          playAnimation();
+        }
+      }
+    }
+
+    function handleGridMouseDown(e) {
+      e.preventDefault();
+      const pixel = getPixelFromEvent(e);
+      if (!pixel) return;
+
+      saveToHistory(); // Save state before drawing
+
+      isDrawing = true;
+      startX = pixel.x;
+      startY = pixel.y;
+      currentX = pixel.x;
+      currentY = pixel.y;
+
+      // Handle immediate tools (pencil, brush, eraser, spray)
+      if (["pencil", "brush", "eraser", "spray"].includes(currentTool)) {
+        applyTool(pixel.x, pixel.y);
+        renderFrame();
+      }
+
+      checkAutoAnimate();
+    }
+
+    function handleGridMouseMove(e) {
+      if (!isDrawing) return;
+      const pixel = getPixelFromEvent(e);
+      if (!pixel) return;
+
+      currentX = pixel.x;
+      currentY = pixel.y;
+
+      // Handle continuous tools (pencil, brush, eraser, spray)
+      if (["pencil", "brush", "eraser", "spray"].includes(currentTool)) {
+        applyTool(pixel.x, pixel.y);
+        renderFrame();
+      } else if (["line", "rect", "circle", "gradient", "pattern"].includes(currentTool)) {
+        // Show preview for shape tools
+        renderFrame();
+        drawShapePreview();
+      }
+    }
+
+    function handleGridMouseUp(e) {
+      if (!isDrawing) return;
+
+      // Handle shape tools (line, rect, circle, gradient, pattern) on mouse up
+      if (["line", "rect", "circle", "gradient", "pattern"].includes(currentTool)) {
+        const pixel = getPixelFromEvent(e);
+        if (pixel) {
+          currentX = pixel.x;
+          currentY = pixel.y;
+        }
+        applyShapeTool();
+        renderFrame();
+      } else if (["fill"].includes(currentTool)) {
+        const frame = frames[currentFrameIndex];
+        floodFill(frame, startX, startY, true);
+        renderFrame();
+      }
+
+      isDrawing = false;
+      checkAutoAnimate();
+    }
+
+    function applyTool(x, y) {
+      const frame = frames[currentFrameIndex];
+      const value = currentTool === "eraser" ? false : true;
+
+      if (currentTool === "spray") {
+        drawSpray(frame, x, y);
+      } else {
+        // Apply brush with size
+        for (let dy = -Math.floor(brushSize/2); dy <= Math.floor(brushSize/2); dy++) {
+          for (let dx = -Math.floor(brushSize/2); dx <= Math.floor(brushSize/2); dx++) {
+            const distance = Math.sqrt(dx*dx + dy*dy);
+            if (distance <= brushSize/2) {
+              if (currentTool === "brush") {
+                drawPixel(frame, x + dx, y + dy, value);
+                applySymmetry(frame, x + dx, y + dy, value);
+              } else if (currentTool === "pencil") {
+                drawPixel(frame, x, y, value);
+                applySymmetry(frame, x, y, value);
+              } else if (currentTool === "eraser") {
+                drawPixel(frame, x + dx, y + dy, false);
+                applySymmetry(frame, x + dx, y + dy, false);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function drawShapePreview() {
+      const frame = frames[currentFrameIndex];
+      const previewValue = true; // Preview in "on" state
+
+      // Create a temporary frame copy for preview
+      const previewFrame = frame.map(row => row.slice());
+
+      switch (currentTool) {
+        case "line":
+          drawLine(previewFrame, startX, startY, currentX, currentY, previewValue, false);
+          break;
+        case "rect":
+          drawRectangle(previewFrame, startX, startY, currentX, currentY, previewValue, false);
+          break;
+        case "circle":
+          drawCircle(previewFrame, startX, startY, Math.sqrt((currentX - startX)**2 + (currentY - startY)**2), previewValue, false);
+          break;
+        case "gradient":
+          drawGradient(previewFrame, startX, startY, currentX, currentY);
+          break;
+        case "pattern":
+          drawPattern(previewFrame, startX, startY, currentX, currentY);
+          break;
+      }
+
+      // Render the preview frame
+      const pixels = pixelGridEl.children;
+      let i = 0;
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          const div = pixels[i++];
+          div.classList.remove("on", "onion", "preview");
+          if (previewFrame[y][x]) {
+            div.classList.add("preview");
+          } else if (frame[y][x]) {
+            div.classList.add("on");
+          }
+        }
+      }
+    }
+
+    function applyShapeTool() {
+      const frame = frames[currentFrameIndex];
+
+      switch (currentTool) {
+        case "line":
+          drawLine(frame, startX, startY, currentX, currentY);
+          break;
+        case "rect":
+          drawRectangle(frame, startX, startY, currentX, currentY);
+          break;
+        case "circle":
+          drawCircle(frame, startX, startY, Math.sqrt((currentX - startX)**2 + (currentY - startY)**2));
+          break;
+        case "gradient":
+          drawGradient(frame, startX, startY, currentX, currentY);
+          break;
+        case "pattern":
+          drawPattern(frame, startX, startY, currentX, currentY);
+          break;
+        case "fill":
+          floodFill(frame, startX, startY, true);
+          break;
+      }
+    }
+
+    function handleGridMouseLeave() {
+      isMouseDown = false;
+    }
+
+    // --- Timeline ------------------------------------------------------------
+    function renderTimeline() {
+      timelineStripEl.innerHTML = "";
+      frames.forEach((frame, index) => {
+        const thumb = document.createElement("div");
+        thumb.className = "frame-thumb";
+        if (index === currentFrameIndex) thumb.classList.add("active");
+
+        const canvas = document.createElement("canvas");
+        const size = 20; // internal resolution for preview
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#020617";
+        ctx.fillRect(0, 0, size, size);
+        ctx.imageSmoothingEnabled = false;
+        ctx.fillStyle = "#f9fafb";
+
+        const maxDim = Math.max(gridWidth, gridHeight) || 1;
+        const scale = size / maxDim;
+
+        for (let y = 0; y < gridHeight; y++) {
+          for (let x = 0; x < gridWidth; x++) {
+            if (frame[y][x]) {
+              const px = x * scale;
+              const py = y * scale;
+              ctx.fillRect(px, py, Math.ceil(scale), Math.ceil(scale));
+            }
+          }
+        }
+
+        const label = document.createElement("div");
+        label.className = "frame-thumb-label";
+        label.textContent = index + 1;
+
+        thumb.appendChild(canvas);
+        thumb.appendChild(label);
+
+        thumb.addEventListener("click", () => {
+          currentFrameIndex = index;
+          stopPlayback();
+          renderFrame();
+        });
+
+        timelineStripEl.appendChild(thumb);
+      });
+    }
+
+    // --- Playback ------------------------------------------------------------
+    function getFPS() {
+      return parseInt(fpsRangeEl.value, 10) || 8;
+    }
+
+    function updateFPSLabel() {
+      fpsLabelEl.textContent = getFPS();
+    }
+
+    function playAnimation() {
+      if (isPlaying || frames.length === 0) return;
+      isPlaying = true;
+      playPauseBtn.textContent = "⏸ Pause";
+      playPauseBtn.classList.add("primary");
+      playStatusEl.textContent = "Playing";
+
+      const interval = 1000 / getFPS();
+      playTimer = setInterval(() => {
+        currentFrameIndex = (currentFrameIndex + 1) % frames.length;
+        renderFrame();
+      }, interval);
+    }
+
+    function stopPlayback() {
+      if (!isPlaying) return;
+      isPlaying = false;
+      playPauseBtn.textContent = "▶ Play";
+      playStatusEl.textContent = "Idle";
+      if (playTimer) {
+        clearInterval(playTimer);
+        playTimer = null;
+      }
+    }
+
+    function restartPlaybackIfNeeded() {
+      if (!isPlaying) return;
+      stopPlayback();
+      playAnimation();
+    }
+
+    // --- Frame operations ----------------------------------------------------
+    function addNewFrame() {
+      const frame = createEmptyFrame();
+      frames.splice(currentFrameIndex + 1, 0, frame);
+      currentFrameIndex++;
+      renderFrame();
+    }
+
+    function duplicateFrame() {
+      const current = frames[currentFrameIndex];
+      const copy = current.map((row) => row.slice());
+      frames.splice(currentFrameIndex + 1, 0, copy);
+      currentFrameIndex++;
+      renderFrame();
+    }
+
+    function deleteFrame() {
+      if (frames.length <= 1) {
+        frames[0] = createEmptyFrame();
+        currentFrameIndex = 0;
+        renderFrame();
+        return;
+      }
+      frames.splice(currentFrameIndex, 1);
+      currentFrameIndex = Math.max(0, currentFrameIndex - 1);
+      renderFrame();
+    }
+
+    function clearFrame() {
+      frames[currentFrameIndex] = createEmptyFrame();
+      renderFrame();
+    }
+
+    function invertFrame() {
+      const frame = frames[currentFrameIndex];
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          frame[y][x] = !frame[y][x];
+        }
+      }
+      renderFrame();
+    }
+
+    function shiftFrame(dx, dy) {
+      const frame = frames[currentFrameIndex];
+      const newFrame = createEmptyFrame();
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight) {
+            newFrame[ny][nx] = frame[y][x];
+          }
+        }
+      }
+      frames[currentFrameIndex] = newFrame;
+      renderFrame();
+    }
+
+    function generateSparkles() {
+      const frame = frames[currentFrameIndex];
+      const density = 0.2; // 20% pixels on
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          frame[y][x] = Math.random() < density;
+        }
+      }
+      renderFrame();
+    }
+
+    function generateNoise() {
+      const frame = frames[currentFrameIndex];
+      const density = 0.5; // 50% pixels
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          frame[y][x] = Math.random() < density;
+        }
+      }
+      renderFrame();
+    }
+
+    function moveFrameLeft() {
+      if (currentFrameIndex <= 0) return;
+      const idx = currentFrameIndex;
+      const tmp = frames[idx - 1];
+      frames[idx - 1] = frames[idx];
+      frames[idx] = tmp;
+      currentFrameIndex--;
+      renderFrame();
+    }
+
+    function moveFrameRight() {
+      if (currentFrameIndex >= frames.length - 1) return;
+      const idx = currentFrameIndex;
+      const tmp = frames[idx + 1];
+      frames[idx + 1] = frames[idx];
+      frames[idx] = tmp;
+      currentFrameIndex++;
+      renderFrame();
+    }
+
+    function reverseFrames() {
+      frames.reverse();
+      currentFrameIndex = frames.length - 1 - currentFrameIndex;
+      renderFrame();
+    }
+
+    // --- Resolution / presets ------------------------------------------------
+    function applyNewSizeFromInputs() {
+      const widthInput = document.getElementById("widthInput");
+      const heightInput = document.getElementById("heightInput");
+      const w = Math.max(4, Math.min(256, parseInt(widthInput.value, 10)));
+      const h = Math.max(4, Math.min(128, parseInt(heightInput.value, 10)));
+
+      gridWidth = isNaN(w) ? 64 : w;
+      gridHeight = isNaN(h) ? 64 : h;
+
+      rebuildAllFramesForNewSize();
+      pixelGridEl.innerHTML = "";
+      buildPixelGrid();
+      fitPixelGridToStage();
+      renderFrame();
+    }
+
+    function setPreset(w, h) {
+      document.getElementById("widthInput").value = w;
+      document.getElementById("heightInput").value = h;
+      applyNewSizeFromInputs();
+    }
+
+    // --- Export --------------------------------------------------------------
+    function framesToC(prefix) {
+      const safePrefix = (prefix || "oledAnim").replace(/[^a-zA-Z0-9_]/g, "_");
+      const lines = [];
+      const w = gridWidth;
+      const h = gridHeight;
+      const bytesPerRow = Math.ceil(w / 8);
+
+      lines.push(
+        `// Generated by BitCanvas Studio`,
+        `// Resolution: ${w}x${h}, Frames: ${frames.length}`,
+        ``,
+        `#include <Arduino.h>`,
+        ``
+      );
+
+      frames.forEach((frame, index) => {
+        const frameName = `${safePrefix}_frame_${index}`;
+        lines.push(
+          `static const uint8_t PROGMEM ${frameName}[] = {`
+        );
+
+        for (let y = 0; y < h; y++) {
+          let rowBytes = [];
+          for (let byteIndex = 0; byteIndex < bytesPerRow; byteIndex++) {
+            let b = 0;
+            for (let bit = 0; bit < 8; bit++) {
+              const x = byteIndex * 8 + bit;
+              const on = x < w ? (frame[y][x] ? 1 : 0) : 0;
+              if (on) {
+                b |= 1 << (7 - bit); // MSB = leftmost pixel
+              }
+            }
+            rowBytes.push(`0x${b.toString(16).padStart(2, "0")}`);
+          }
+          lines.push(`  ${rowBytes.join(", ")}, // row ${y}`);
+        }
+
+        lines.push(`};`, ``);
+      });
+
+      const listName = `${safePrefix}_frames`;
+      lines.push(
+        `static const uint8_t* const ${listName}[] PROGMEM = {`
+      );
+      frames.forEach((_, index) => {
+        lines.push(
+          `  ${safePrefix}_frame_${index}${
+            index < frames.length - 1 ? "," : ""
+          }`
+        );
+      });
+      lines.push(`};`, ``);
+
+      lines.push(
+        `// Usage example (Adafruit GFX style):`,
+        `//`,
+        `// const uint8_t FRAME_W = ${w};`,
+        `// const uint8_t FRAME_H = ${h};`,
+        `// const uint8_t FRAME_COUNT = ${frames.length};`,
+        `// uint8_t currentFrame = 0;`,
+        `//`,
+        `// void drawFrame(uint8_t idx) {`,
+        `//   idx %= FRAME_COUNT;`,
+        `//   const uint8_t* frame = (const uint8_t*)pgm_read_ptr(&${listName}[idx]);`,
+        `//   display.clearDisplay();`,
+        `//   display.drawBitmap(0, 0, frame, FRAME_W, FRAME_H, 1);`,
+        `//   display.display();`,
+        `// }`,
+        `//`,
+        `// Call drawFrame(i) in a timer / loop to animate.`
+      );
+
+      return lines.join("\n");
+    }
+
+    function framesToJSON() {
+      const payload = {
+        width: gridWidth,
+        height: gridHeight,
+        frames: frames.map((frame) =>
+          frame.map((row) => row.map((v) => (v ? 1 : 0)))
+        ),
+      };
+      return JSON.stringify(payload, null, 2);
+    }
+
+    async function copyExportText() {
+      const text = exportOutputEl.value;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        showTempStatus("Copied!", 900);
+      } catch (e) {
+        showTempStatus("Clipboard blocked", 900);
+      }
+    }
+
+    function showTempStatus(msg, ms) {
+      const old = playStatusEl.textContent;
+      playStatusEl.textContent = msg;
+      setTimeout(() => {
+        playStatusEl.textContent = isPlaying ? "Playing" : "Idle";
+      }, ms || 800);
+    }
+
+    // --- Brush UI (legacy - kept for compatibility) -----------------------------
+    function setBrushMode(mode) {
+      brushMode = mode;
+      // Legacy function - no longer used with new tool system
+    }
+
+    // --- Tool Selection ------------------------------------------------------
+    function setTool(tool) {
+      currentTool = tool;
+
+      // Remove primary class from all tool buttons
+      const toolButtons = [
+        "toolPencilBtn", "toolBrushBtn", "toolEraserBtn", "toolLineBtn",
+        "toolRectBtn", "toolCircleBtn", "toolFillBtn", "toolSelectBtn",
+        "toolSprayBtn", "toolGradientBtn", "toolPatternBtn", "toolSymmetryBtn"
+      ];
+
+      toolButtons.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+          btn.classList.remove("primary");
+        }
+      });
+
+      // Add primary class to selected tool
+      const selectedBtnId = `tool${tool.charAt(0).toUpperCase() + tool.slice(1)}Btn`;
+      const selectedBtn = document.getElementById(selectedBtnId);
+      if (selectedBtn) {
+        selectedBtn.classList.add("primary");
+      }
+
+      // Update cursor style based on tool
+      const grid = document.getElementById("pixelGrid");
+      grid.style.cursor = getToolCursor(tool);
+    }
+
+    function getToolCursor(tool) {
+      switch (tool) {
+        case "pencil": return "crosshair";
+        case "brush": return "crosshair";
+        case "eraser": return "crosshair";
+        case "spray": return "crosshair";
+        case "line": return "crosshair";
+        case "rect": return "crosshair";
+        case "circle": return "crosshair";
+        case "fill": return "pointer";
+        case "select": return "pointer";
+        case "gradient": return "crosshair";
+        case "pattern": return "crosshair";
+        case "symmetry": return "pointer";
+        default: return "crosshair";
+      }
+    }
+
+    // --- Onion skin ----------------------------------------------------------
+    function setOnionSkin(enabled) {
+      onionSkinEnabled = enabled;
+      renderFrame();
+    }
+
+    // --- Event wiring --------------------------------------------------------
+    function bindUI() {
+      document
+        .getElementById("applySizeBtn")
+        .addEventListener("click", () => {
+          stopPlayback();
+          applyNewSizeFromInputs();
+        });
+
+      document
+        .getElementById("newFrameBtn")
+        .addEventListener("click", () => {
+          stopPlayback();
+          addNewFrame();
+        });
+
+      document
+        .getElementById("duplicateFrameBtn")
+        .addEventListener("click", () => {
+          stopPlayback();
+          duplicateFrame();
+        });
+
+      document
+        .getElementById("deleteFrameBtn")
+        .addEventListener("click", () => {
+          stopPlayback();
+          deleteFrame();
+        });
+
+      document
+        .getElementById("clearFrameBtn")
+        .addEventListener("click", () => {
+          clearFrame();
+        });
+
+      document
+        .getElementById("invertFrameBtn")
+        .addEventListener("click", () => {
+          invertFrame();
+        });
+
+      document
+        .getElementById("shiftUpBtn")
+        .addEventListener("click", () => shiftFrame(0, -1));
+      document
+        .getElementById("shiftDownBtn")
+        .addEventListener("click", () => shiftFrame(0, 1));
+      document
+        .getElementById("shiftLeftBtn")
+        .addEventListener("click", () => shiftFrame(-1, 0));
+      document
+        .getElementById("shiftRightBtn")
+        .addEventListener("click", () => shiftFrame(1, 0));
+
+      document
+        .getElementById("sparklesBtn")
+        .addEventListener("click", () => {
+          generateSparkles();
+        });
+
+      document
+        .getElementById("randomNoiseBtn")
+        .addEventListener("click", () => {
+          generateNoise();
+        });
+
+      document
+        .getElementById("moveFrameLeftBtn")
+        .addEventListener("click", () => moveFrameLeft());
+      document
+        .getElementById("moveFrameRightBtn")
+        .addEventListener("click", () => moveFrameRight());
+      document
+        .getElementById("reverseFramesBtn")
+        .addEventListener("click", () => reverseFrames());
+
+      fpsRangeEl.addEventListener("input", () => {
+        updateFPSLabel();
+        restartPlaybackIfNeeded();
+      });
+
+      playPauseBtn.addEventListener("click", () => {
+        if (isPlaying) stopPlayback();
+        else playAnimation();
+      });
+
+      document
+        .getElementById("exportCBtn")
+        .addEventListener("click", () => {
+          const prefix = document.getElementById("symbolPrefix").value.trim();
+          exportOutputEl.value = framesToC(prefix);
+        });
+
+      document
+        .getElementById("exportJsonBtn")
+        .addEventListener("click", () => {
+          exportOutputEl.value = framesToJSON();
+        });
+
+      document
+        .getElementById("copyExportBtn")
+        .addEventListener("click", () => {
+          copyExportText();
+        });
+
+      // --- Import bitmap ----------------------------------------------------
+      if (importThresholdEl && importThresholdLabelEl) {
+        importThresholdLabelEl.textContent = `${importThresholdEl.value}`;
+        importThresholdEl.addEventListener("input", () => {
+          importThresholdLabelEl.textContent = `${importThresholdEl.value}`;
+        });
+      }
+
+      if (importImageInputEl) {
+        importImageInputEl.addEventListener("change", async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          try {
+            const img = new Image();
+            img.decoding = "async";
+            const url = URL.createObjectURL(file);
+            img.src = url;
+            await img.decode();
+            URL.revokeObjectURL(url);
+
+            const threshold = parseInt(importThresholdEl ? importThresholdEl.value : "128", 10) || 128;
+            const invert = !!(importInvertToggleEl && importInvertToggleEl.checked);
+            const frame = imageToFrame(img, threshold, invert);
+
+            saveToHistory();
+            importFrame(frame);
+            showTempStatus("Imported!", 900);
+          } catch (err) {
+            showTempStatus("Import failed", 900);
+            console.error(err);
+          } finally {
+            // allow re-importing the same file
+            importImageInputEl.value = "";
+          }
+        });
+      }
+
+      const importCBtn = document.getElementById("importCBtn");
+      if (importCBtn) {
+        importCBtn.addEventListener("click", () => {
+          const text = (importCTextEl && importCTextEl.value) ? importCTextEl.value : "";
+          if (!text.trim()) {
+            showTempStatus("Paste bytes first", 900);
+            return;
+          }
+          try {
+            const bytes = parseHexBytes(text);
+            const frame = cBytesToFrame(bytes, gridWidth, gridHeight);
+            const invert = !!(importInvertToggleEl && importInvertToggleEl.checked);
+            if (invert) {
+              for (let y = 0; y < gridHeight; y++) {
+                for (let x = 0; x < gridWidth; x++) frame[y][x] = !frame[y][x];
+              }
+            }
+
+            saveToHistory();
+            importFrame(frame);
+            showTempStatus("Imported!", 900);
+          } catch (err) {
+            showTempStatus("Bad bitmap", 900);
+            console.error(err);
+          }
+        });
+      }
+
+      // Legacy brush mode buttons removed - now using individual tool buttons
+
+      document
+        .getElementById("onionSkinToggle")
+        .addEventListener("change", (e) => {
+          setOnionSkin(e.target.checked);
+        });
+
+      document
+        .getElementById("onionSkinDepth")
+        .addEventListener("change", (e) => {
+          onionSkinDepth = e.target.value;
+          renderFrame();
+        });
+
+      document
+        .getElementById("onionSkinAllToggle")
+        .addEventListener("change", (e) => {
+          onionSkinAllFrames = e.target.checked;
+          renderFrame();
+        });
+
+      document
+        .getElementById("autoAnimateToggle")
+        .addEventListener("change", (e) => {
+          autoAnimateEnabled = e.target.checked;
+        });
+
+      document
+        .getElementById("animationFramesInput")
+        .addEventListener("input", (e) => {
+          const value = parseInt(e.target.value, 10);
+          animationFrameCount = Math.max(4, Math.min(50, value || 12));
+          e.target.value = animationFrameCount;
+        });
+
+      // Tool buttons
+      const toolButtons = [
+        { id: "toolPencilBtn", tool: "pencil" },
+        { id: "toolBrushBtn", tool: "brush" },
+        { id: "toolEraserBtn", tool: "eraser" },
+        { id: "toolLineBtn", tool: "line" },
+        { id: "toolRectBtn", tool: "rect" },
+        { id: "toolCircleBtn", tool: "circle" },
+        { id: "toolFillBtn", tool: "fill" },
+        { id: "toolSelectBtn", tool: "select" },
+        { id: "toolSprayBtn", tool: "spray" },
+        { id: "toolGradientBtn", tool: "gradient" },
+        { id: "toolPatternBtn", tool: "pattern" },
+        { id: "toolSymmetryBtn", tool: "symmetry" }
+      ];
+
+      toolButtons.forEach(({ id, tool }) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.addEventListener("click", () => setTool(tool));
+        }
+      });
+
+      // Brush size
+      document.getElementById("brushSizeSlider").addEventListener("input", (e) => {
+        brushSize = parseInt(e.target.value, 10);
+        document.getElementById("brushSizeLabel").textContent = `Size: ${brushSize}`;
+      });
+
+      // Undo/Redo
+      document.getElementById("undoBtn").addEventListener("click", undo);
+      document.getElementById("redoBtn").addEventListener("click", redo);
+      document.getElementById("clearHistoryBtn").addEventListener("click", clearHistory);
+
+      // Symmetry toggles
+      document.getElementById("symmetryHToggle").addEventListener("change", (e) => {
+        symmetryHEnabled = e.target.checked;
+      });
+      document.getElementById("symmetryVToggle").addEventListener("change", (e) => {
+        symmetryVEnabled = e.target.checked;
+      });
+
+      updateFPSLabel();
+    }
+
+    // --- Keyboard Shortcuts -------------------------------------------------
+    function handleKeyDown(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case 'z':
+            e.preventDefault();
+            if (e.shiftKey) {
+              redo();
+            } else {
+              undo();
+            }
+            break;
+          case 'y':
+            e.preventDefault();
+            redo();
+            break;
+        }
+      }
+
+      // Tool shortcuts
+      switch (e.key) {
+        case 'p':
+          setTool("pencil");
+          break;
+        case 'b':
+          setTool("brush");
+          break;
+        case 'e':
+          setTool("eraser");
+          break;
+        case 'l':
+          setTool("line");
+          break;
+        case 'r':
+          setTool("rect");
+          break;
+        case 'c':
+          setTool("circle");
+          break;
+        case 'f':
+          setTool("fill");
+          break;
+        case 's':
+          setTool("spray");
+          break;
+        case 'g':
+          setTool("gradient");
+          break;
+      }
+    }
+
+    // --- Init ---------------------------------------------------------------
+    function init() {
+      frames = [createEmptyFrame()];
+      currentFrameIndex = 0;
+      buildPixelGrid();
+      bindUI();
+      renderFrame();
+      fitPixelGridToStage();
+      updateImportResHint();
+
+      // Initialize tool selection and undo/redo state
+      setTool("pencil");
+      updateUndoRedoButtons();
+
+      // Add keyboard event listener
+      document.addEventListener("keydown", handleKeyDown);
+
+      // Keep the grid fitted if the middle column size changes (panel resize, window resize, etc.)
+      window.addEventListener("resize", fitPixelGridToStage);
+      if (window.ResizeObserver && pixelStageEl) {
+        const ro = new ResizeObserver(() => fitPixelGridToStage());
+        ro.observe(pixelStageEl);
+      }
+    }
+
+    // Wait for DOM to be fully loaded before initializing
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>

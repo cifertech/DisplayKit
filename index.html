@@ -25,7 +25,17 @@
       </a>
     </div>
 
-    <div class="sidebar-card note">
+    <div class="sidebar-card tools-card">
+      <div class="sidebar-card-title">Tools</div>
+      <a class="link-chip" href="tools/pixelforge/index.html" data-open-tool="pixelforge" rel="noreferrer">
+        <span class="icon">🧩</span> PixelForge (Image Converter)
+      </a>
+      <a class="link-chip" href="tools/bitcanvas-studio/index.html" data-open-tool="bitcanvas" rel="noreferrer">
+        <span class="icon">🎞️</span> BitCanvas Studio (Animation)
+      </a>
+    </div>
+
+    <div class="sidebar-card note section-card">
       <div class="sidebar-card-title">Workflow tips</div>
       <ul>
         <li>Use Snap-to-grid for pixel-perfect layouts.</li>
@@ -54,16 +64,112 @@
             <option value="u8g2">U8g2 OLED</option>
           </select>
         </div>
-        <div>
-          <label for="u8g2Preset">U8g2 Display</label>
-          <select id="u8g2Preset">
-            
-          </select>
-        </div>
       </div>
       <button class="btn small secondary icon-btn-ghost" id="applyRes" title="Apply resolution">
         <span>Apply</span>
       </button>
+    </div>
+
+    <!-- TFT Display Settings -->
+    <div id="tftSettings" class="display-settings">
+      <div class="section-title">TFT Display Settings</div>
+      <div class="prop-group">
+        <div class="prop-row">
+          <div>
+            <label for="tftRotation">Rotation</label>
+            <select id="tftRotation">
+              <option value="0">0° (Portrait)</option>
+              <option value="1">90° (Landscape)</option>
+              <option value="2">180° (Portrait)</option>
+              <option value="3">270° (Landscape)</option>
+            </select>
+          </div>
+          <div>
+            <label for="tftColorDepth">Color Depth</label>
+            <select id="tftColorDepth">
+              <option value="16">16-bit RGB565</option>
+              <option value="18">18-bit RGB666</option>
+              <option value="24">24-bit RGB888</option>
+            </select>
+          </div>
+        </div>
+        <div class="prop-row">
+          <div>
+            <label for="tftBacklight">Backlight Control</label>
+            <select id="tftBacklight">
+              <option value="none">None</option>
+              <option value="pwm">PWM Pin</option>
+              <option value="manual">Manual</option>
+            </select>
+          </div>
+          <div>
+            <label for="tftTouch">Touch Support</label>
+            <select id="tftTouch">
+              <option value="none">No Touch</option>
+              <option value="resistive">Resistive</option>
+              <option value="capacitive">Capacitive</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OLED Display Settings -->
+    <div id="oledSettings" class="display-settings">
+      <div class="section-title">OLED Display Settings</div>
+      <div class="prop-group">
+        <div class="prop-row">
+          <div>
+            <label for="u8g2Preset">U8g2 Display Model</label>
+            <select id="u8g2Preset">
+
+            </select>
+          </div>
+          <div>
+            <label for="oledRotation">Rotation</label>
+            <select id="oledRotation">
+              <option value="0">0° (Normal)</option>
+              <option value="1">90° (Clockwise)</option>
+              <option value="2">180° (Upside Down)</option>
+              <option value="3">270° (Counter-clockwise)</option>
+            </select>
+          </div>
+        </div>
+        <div class="prop-row">
+          <div>
+            <label for="oledContrast">Contrast (0-255)</label>
+            <input type="range" id="oledContrast" min="0" max="255" value="127" />
+            <span id="oledContrastValue">127</span>
+          </div>
+          <div>
+            <label for="oledFlipMode">Flip Mode</label>
+            <select id="oledFlipMode">
+              <option value="none">Normal</option>
+              <option value="horizontal">Horizontal Flip</option>
+              <option value="vertical">Vertical Flip</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+        </div>
+        <div class="prop-row">
+          <div>
+            <label for="oledFontMode">Font Rendering</label>
+            <select id="oledFontMode">
+              <option value="transparent">Transparent Background</option>
+              <option value="solid">Solid Background</option>
+              <option value="inverse">Inverse Colors</option>
+            </select>
+          </div>
+          <div>
+            <label for="oledPowerSave">Power Save Mode</label>
+            <select id="oledPowerSave">
+              <option value="off">Always On</option>
+              <option value="auto">Auto Sleep</option>
+              <option value="manual">Manual Control</option>
+            </select>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="section-title">Screens</div>
@@ -99,7 +205,7 @@
       </div>
     </div>
 
-    <div class="sidebar-card">
+    <div class="sidebar-card section-card">
       <div class="sidebar-card-title">Basic Shapes</div>
       <div class="btn-group">
         <button class="btn small chip-btn" data-add="rect" title="Rect">
@@ -108,6 +214,7 @@
               <rect x="5" y="7" width="14" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
             </svg>
           </span>
+          <span class="chip-label">Rect</span>
         </button>
         <button class="btn small chip-btn" data-add="roundrect" title="Round Rect">
           <span class="icon-box shape">
@@ -115,6 +222,7 @@
               <rect x="5" y="7" width="14" height="10" rx="5" ry="5" stroke="currentColor" stroke-width="2" fill="none" />
             </svg>
           </span>
+          <span class="chip-label">Round</span>
         </button>
         <button class="btn small chip-btn" data-add="circle" title="Circle">
           <span class="icon-box shape">
@@ -122,6 +230,7 @@
               <circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="2" fill="none" />
             </svg>
           </span>
+          <span class="chip-label">Circle</span>
         </button>
         <button class="btn small chip-btn" data-add="line" title="Line">
           <span class="icon-box shape">
@@ -129,6 +238,7 @@
               <line x1="5" y1="18" x2="19" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
             </svg>
           </span>
+          <span class="chip-label">Line</span>
         </button>
         <button class="btn small chip-btn" data-add="divider" title="Divider">
           <span class="icon-box shape">
@@ -136,11 +246,12 @@
               <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
             </svg>
           </span>
+          <span class="chip-label">Divider</span>
         </button>
       </div>
     </div>
 
-    <div class="sidebar-card">
+    <div class="sidebar-card section-card">
       <div class="sidebar-card-title">UI Elements</div>
       <div class="btn-group">
         <button class="btn small chip-btn" data-add="label" title="Label">
@@ -150,6 +261,7 @@
               <line x1="8" y1="11" x2="16" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
             </svg>
           </span>
+          <span class="chip-label">Label</span>
         </button>
         <button class="btn small chip-btn" data-add="button" title="Button">
           <span class="icon-box ui">
@@ -157,6 +269,7 @@
               <rect x="6" y="9" width="12" height="6" rx="3" ry="3" stroke="currentColor" stroke-width="2" fill="none" />
             </svg>
           </span>
+          <span class="chip-label">Button</span>
         </button>
         <button class="btn small chip-btn" data-add="progress" title="Progress">
           <span class="icon-box ui">
@@ -165,6 +278,7 @@
               <rect x="6" y="11" width="7" height="2" rx="1" ry="1" fill="currentColor" />
             </svg>
           </span>
+          <span class="chip-label">Progress</span>
         </button>
         <button class="btn small chip-btn" data-add="slider" title="Slider">
           <span class="icon-box ui">
@@ -173,6 +287,7 @@
               <circle cx="10" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="var(--bg-tertiary)" />
             </svg>
           </span>
+          <span class="chip-label">Slider</span>
         </button>
         <button class="btn small chip-btn" data-add="toggle" title="Toggle">
           <span class="icon-box ui">
@@ -181,6 +296,7 @@
               <circle cx="15" cy="12" r="2.5" stroke="currentColor" stroke-width="2" fill="var(--bg-tertiary)" />
             </svg>
           </span>
+          <span class="chip-label">Toggle</span>
         </button>
         <button class="btn small chip-btn" data-add="card" title="Card">
           <span class="icon-box ui">
@@ -189,6 +305,7 @@
               <line x1="7" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
             </svg>
           </span>
+          <span class="chip-label">Card</span>
         </button>
         <button class="btn small chip-btn" data-add="header" title="Header">
           <span class="icon-box ui">
@@ -196,6 +313,7 @@
               <rect x="5" y="7" width="14" height="4" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
             </svg>
           </span>
+          <span class="chip-label">Header</span>
         </button>
         <button class="btn small chip-btn" id="addImageBtn" title="Image">
           <span class="icon-box ui">
@@ -205,12 +323,18 @@
               <polyline points="7,16 11,12 16,16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </span>
+          <span class="chip-label">Image</span>
         </button>
       </div>
     </div>
 
-    <div class="section-title">Scene</div>
-    <div class="sidebar-card">
+      <div class="section-title">
+        Scene
+        <span style="font-size: 10px; font-weight: normal; opacity: 0.7; margin-left: 8px;">
+          Tab: cycle elements • Ctrl+D: duplicate • Arrows: move • Ctrl+1-6: align
+        </span>
+      </div>
+    <div class="sidebar-card section-card">
       <div class="sidebar-card-title">Background</div>
       <div class="bg-color-row">
         <div class="bg-presets">
@@ -360,7 +484,7 @@
 
           <div class="prop-group">
             <label>Colors</label>
-            <div class="prop-row">
+            <div class="prop-row color-row">
               <div class="pill">
                 <input type="color" id="propFillColor" />
                 <span>Fill</span>
@@ -372,6 +496,22 @@
               <div class="pill">
                 <input type="color" id="propTextColor" />
                 <span>Text</span>
+              </div>
+            </div>
+            <div class="prop-row" id="fillTransparencyRow">
+              <div>
+                <label for="propFillAlpha">Fill Transparency</label>
+                <input type="range" id="propFillAlpha" min="0" max="255" value="255" />
+                <span id="fillAlphaValue">100%</span>
+              </div>
+            </div>
+            <div class="prop-row" id="oledFillRow" style="display: none;">
+              <div class="fill-control">
+                <input type="checkbox" id="propOLEDFill" checked />
+                <label for="propOLEDFill" class="fill-label">
+                  <span class="fill-indicator"></span>
+                  Filled
+                </label>
               </div>
             </div>
           </div>
@@ -403,13 +543,14 @@
           </div>
 
           <div class="prop-group" style="display: flex; justify-content: flex-end;">
-            <button class="btn secondary small icon-btn-ghost" id="deleteElement" title="Delete element">
+            <button class="btn danger small" id="deleteElement" title="Delete element">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <polyline points="9,6 10,4 14,4 15,6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
                 <rect x="7" y="6" width="10" height="12" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
                 <line x1="10" y1="10" x2="10" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                 <line x1="14" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
               </svg>
+              <span>Delete</span>
             </button>
           </div>
         </div>
@@ -438,6 +579,46 @@
   
   <input type="file" id="imageInput" accept="image/*" style="display: none" />
   <input type="file" id="importJsonInput" accept="application/json" style="display:none" />
+
+  <!-- In-app tools overlay (PixelForge / BitCanvas Studio) -->
+  <div class="tool-overlay" id="toolOverlay" aria-hidden="true">
+    <div class="tool-overlay-inner" role="dialog" aria-modal="true" aria-label="Tools">
+      <div class="tool-overlay-bar">
+        <div class="tool-overlay-title">
+          <span class="pill outline" id="toolOverlayPill">Tools</span>
+          <div class="tool-switcher" role="tablist" aria-label="Tools switcher">
+            <button class="tool-switch-btn" type="button" data-switch-tool="pixelforge" role="tab" aria-selected="false">
+              🧩 PixelForge
+            </button>
+            <button class="tool-switch-btn" type="button" data-switch-tool="bitcanvas" role="tab" aria-selected="false">
+              🎞️ BitCanvas
+            </button>
+          </div>
+        </div>
+        <div class="tool-overlay-actions">
+          <button class="btn small success" id="toolOverlayAction" type="button" style="display:none">Action</button>
+          <a class="btn small secondary" id="toolOverlayOpenNewTab" href="#" target="_blank" rel="noreferrer">Open in new tab</a>
+          <button class="btn small" id="toolOverlayClose" type="button">Back to DisplayKit</button>
+        </div>
+      </div>
+      <div class="tool-overlay-frames">
+        <iframe
+          id="toolFrame_pixelforge"
+          class="tool-overlay-frame"
+          title="PixelForge"
+          src="about:blank"
+          allow="clipboard-read; clipboard-write"
+        ></iframe>
+        <iframe
+          id="toolFrame_bitcanvas"
+          class="tool-overlay-frame"
+          title="BitCanvas Studio"
+          src="about:blank"
+          allow="clipboard-read; clipboard-write"
+        ></iframe>
+      </div>
+    </div>
+  </div>
   <script src="app.js"></script>
 </body>
 </html>

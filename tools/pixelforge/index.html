@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PixelForge - TFT & OLED Image Converter | CiferTech</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<style>
+  :root {
+    --bg-light: #ffffff;
+    --card-light: #f0f0f0;
+    --border-light: #d0d0d0;
+    --fg-light: #2a2a2a;
+    --fg-secondary-light: #555555;
+
+    /* DisplayKit-like dark */
+    --bg-dark: #1a1a1a;
+    --card-dark: #252525;
+    --border-dark: #404040;
+    --fg-dark: #f0f0f0;
+    --fg-secondary-dark: #c8c8c8;
+
+    /* DisplayKit accent */
+    --accent: #FF6D1F;
+    --accent-hover: #ff8533;
+    --accent-light: rgba(255, 109, 31, 0.14);
+    --success: #1a7f37;
+    --warning: #9a6700;
+  }
+  
+  .light {
+    --bg: var(--bg-light);
+    --card: var(--card-light);
+    --border: var(--border-light);
+    --fg: var(--fg-light);
+    --fg-secondary: var(--fg-secondary-light);
+    --shadow: rgba(31, 35, 40, 0.04);
+    --shadow-hover: rgba(31, 35, 40, 0.1);
+
+    --scrollbar-track: rgba(0, 0, 0, 0.06);
+    --scrollbar-thumb: rgba(0, 0, 0, 0.22);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.34);
+  }
+  
+  .dark {
+    --bg: var(--bg-dark);
+    --card: var(--card-dark);
+    --border: var(--border-dark);
+    --fg: var(--fg-dark);
+    --fg-secondary: var(--fg-secondary-dark);
+    --shadow: rgba(0, 0, 0, 0.3);
+    --shadow-hover: rgba(0, 0, 0, 0.5);
+
+    --scrollbar-track: rgba(255, 255, 255, 0.06);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+  }
+  
+  * {
+    box-sizing: border-box;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  /* Global scrollbar theming (PixelForge) */
+  * {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); /* Firefox */
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 999px;
+    border: 2px solid var(--scrollbar-track);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  
+  body {
+    margin: 0;
+    padding: 32px 24px;
+    background: var(--bg);
+    color: var(--fg);
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    transition: background 0.3s ease, color 0.3s ease;
+    line-height: 1.6;
+  }
+  
+  .app {
+    width: 100%;
+    max-width: 1400px;
+  }
+  
+  h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    text-align: center;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+  
+  h1 span {
+    color: var(--accent);
+  }
+  
+  .subtitle {
+    text-align: center;
+    margin-top: 4px;
+    margin-bottom: 16px;
+    color: var(--fg-secondary);
+    font-size: 0.95rem;
+  }
+  
+  .header-brand {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  
+  .brand-name {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin: 0;
+    background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 50%, #2563eb 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+  }
+  
+  .brand-subtitle {
+    font-size: 0.95rem;
+    color: var(--fg-secondary);
+    margin: 4px 0 8px 0;
+    font-weight: 400;
+  }
+  
+  .brand-creator {
+    font-size: 0.85rem;
+    color: var(--fg-secondary);
+    margin: 0;
+    font-weight: 500;
+  }
+  
+  .brand-creator span {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  
+  .social-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 24px;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  
+  .social-btn,
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0;
+    margin: 0;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    background: var(--card);
+    color: var(--fg);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+    box-shadow: 0 2px 8px var(--shadow);
+    width: 140px;
+    height: 44px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    text-align: center;
+    box-sizing: border-box;
+    line-height: 1;
+    vertical-align: middle;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .theme-toggle {
+    font-family: inherit;
+  }
+  
+  .social-btn:hover,
+  .theme-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--shadow-hover);
+  }
+  
+  .social-btn.patreon {
+    border-color: #ff424d;
+    color: #ff424d;
+  }
+  
+  .social-btn.patreon:hover {
+    background: #ff424d;
+    color: white;
+  }
+  
+  .social-btn.github {
+    border-color: #24292e;
+    color: #24292e;
+  }
+  
+  .dark .social-btn.github {
+    border-color: var(--fg);
+    color: var(--fg);
+  }
+  
+  .social-btn.github:hover {
+    background: #24292e;
+    color: white;
+  }
+  
+  .dark .social-btn.github:hover {
+    background: var(--fg);
+    color: var(--bg);
+  }
+  
+  .theme-toggle:hover {
+    border-color: var(--accent);
+    background: rgba(37, 99, 235, 0.1);
+  }
+  
+  .theme-icon {
+    font-size: 1.1rem;
+    transition: transform 0.3s ease;
+    display: inline-block;
+    line-height: 1;
+    vertical-align: middle;
+  }
+  
+  .theme-toggle:hover .theme-icon {
+    transform: rotate(20deg);
+  }
+  
+  .social-btn span,
+  .theme-toggle span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    vertical-align: middle;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(560px, 0.65fr) minmax(480px, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  
+  @media (max-width: 1150px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    body {
+      padding: 16px;
+    }
+    .brand-name {
+      font-size: 2rem;
+    }
+    .social-buttons {
+      gap: 8px;
+      flex-wrap: nowrap;
+      align-items: center;
+    }
+    .social-btn,
+    .theme-toggle {
+      width: 110px;
+      height: 44px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      padding: 20px;
+    }
+    .social-buttons {
+      flex-wrap: wrap;
+    }
+    .social-btn,
+    .theme-toggle {
+      flex: 1;
+      min-width: 100px;
+    }
+  }
+  
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 24px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px var(--shadow), 0 2px 4px -1px var(--shadow);
+    backdrop-filter: blur(10px);
+  }
+  
+  .card:hover {
+    box-shadow: 0 10px 15px -3px var(--shadow-hover), 0 4px 6px -2px var(--shadow-hover);
+    transform: translateY(-2px);
+  }
+  
+  .card.right {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+  }
+  
+  .card.right .pill {
+    flex-shrink: 0;
+  }
+  
+  .card.right .output-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    margin-bottom: 16px;
+  }
+  
+  .card.right .meta {
+    flex-shrink: 0;
+  }
+  
+  .label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--fg-secondary);
+    margin-top: 16px;
+    margin-bottom: 8px;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    display: block;
+  }
+  
+  input,
+  select {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: var(--card);
+    color: var(--fg);
+    font-size: 0.95rem;
+    margin-top: 4px;
+    transition: all 0.2s ease;
+    outline: none;
+  }
+  
+  input:focus,
+  select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(255, 109, 31, 0.18);
+    transform: translateY(-1px);
+  }
+  
+  input::placeholder {
+    color: var(--fg-secondary);
+    opacity: 0.6;
+  }
+  
+  .row {
+    display: flex;
+    gap: 12px;
+  }
+  
+  button {
+    width: 100%;
+    padding: 14px 20px;
+    margin-top: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--accent);
+    font-weight: 600;
+    font-size: 1rem;
+    color: white;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(255, 109, 31, 0.28);
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  
+  .card.right button {
+    flex-shrink: 0;
+  }
+  
+  button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+  }
+  
+  button:hover::before {
+    width: 300px;
+    height: 300px;
+  }
+  
+  button:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(255, 109, 31, 0.32);
+  }
+  
+  button:active {
+    transform: translateY(0);
+    box-shadow: 0 8px 16px rgba(255, 109, 31, 0.24);
+  }
+  
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .small-btn {
+    width: auto;
+    font-size: 0.8rem;
+    padding: 5px 14px;
+  }
+  
+  .preview2x2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: auto;
+    gap: 20px;
+    margin-top: 24px;
+  }
+  
+  .preview-item {
+    transition: transform 0.2s ease;
+  }
+  
+  .preview-item:hover {
+    transform: translateY(-2px);
+  }
+  
+  .preview-item canvas {
+    width: 100%;
+    background: #000;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+  }
+  
+  .preview-item canvas:hover {
+    border-color: var(--accent);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(9, 105, 218, 0.15);
+  }
+  
+  .small-label {
+    text-align: center;
+    margin-bottom: 8px;
+    font-size: 0.8rem;
+    color: var(--fg-secondary);
+    font-weight: 500;
+  }
+  
+  pre {
+    background: rgba(0, 0, 0, 0.78);
+    color: #f0f0f0;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 109, 31, 0.18);
+    padding: 20px;
+    white-space: pre-wrap;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin-top: 12px;
+    margin-bottom: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    line-height: 1.6;
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.35);
+    transition: all 0.2s ease;
+  }
+  
+  pre::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  pre::-webkit-scrollbar-track {
+    background: #1e293b;
+    border-radius: 4px;
+  }
+  
+  pre::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+  }
+  
+  pre::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+  
+  .light pre {
+    background: rgba(17, 24, 39, 0.92);
+    border-color: rgba(255, 109, 31, 0.18);
+  }
+
+  .dark pre {
+    background: rgba(0, 0, 0, 0.72);
+    border-color: rgba(255, 109, 31, 0.20);
+  }
+  
+  .meta {
+    font-size: 0.85rem;
+    color: var(--fg-secondary);
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+  
+  .meta code {
+    background: var(--border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-family: 'Consolas', 'Monaco', monospace;
+    color: var(--accent);
+  }
+  
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, rgba(255, 109, 31, 0.14) 0%, rgba(255, 109, 31, 0.06) 100%);
+    border: 1px solid rgba(255, 109, 31, 0.24);
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+  
+  .pill-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* DisplayKit-style neon Tools card (standalone tool pages) */
+  .dk-tools-card {
+    border: 2px solid rgba(255, 109, 31, 0.45);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 109, 31, 0.14),
+      rgba(255, 109, 31, 0.06)
+    );
+    box-shadow:
+      0 14px 32px rgba(0, 0, 0, 0.16),
+      0 0 0 1px rgba(255, 109, 31, 0.10);
+    border-radius: 16px;
+    padding: 14px 14px;
+    margin: 0 0 16px 0;
+  }
+  .dk-tools-title {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--accent);
+    margin: 0 0 10px 0;
+  }
+  .dk-tools-links {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .dk-tool-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 109, 31, 0.18);
+    background: rgba(255, 255, 255, 0.75);
+    color: var(--fg);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .dark .dk-tool-link {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .dk-tool-link:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 109, 31, 0.55);
+    background: rgba(255, 255, 255, 0.92);
+  }
+  .dark .dk-tool-link:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .dk-tool-link.active {
+    border-color: rgba(255, 109, 31, 0.65);
+    box-shadow: 0 0 0 1px rgba(255, 109, 31, 0.18);
+  }
+  .dk-tool-link::after {
+    content: "↗";
+    opacity: 0.7;
+    margin-left: 2px;
+  }
+
+  /* Embedded inside DisplayKit */
+  body.embedded {
+    padding: 16px;
+  }
+  body.embedded .social-buttons {
+    display: none !important;
+  }
+  /* Avoid duplicated header (DisplayKit overlay already shows tool name) */
+  body.embedded .header-brand {
+    display: none !important;
+  }
+  body.embedded .dk-tools-card {
+    display: none !important;
+  }
+
+  /* Make PixelForge match DisplayKit theme when embedded */
+  body.embedded {
+    --accent: #FF6D1F;
+    --accent-hover: #ff8533;
+  }
+  body.embedded.light {
+    --bg-light: #f8f8f8;
+    --card-light: #f0f0f0;
+    --border-light: #d0d0d0;
+    --fg-light: #2a2a2a;
+    --fg-secondary-light: #555555;
+  }
+  body.embedded.dark {
+    --bg-dark: #1a1a1a;
+    --card-dark: #252525;
+    --border-dark: #404040;
+    --fg-dark: #f0f0f0;
+    --fg-secondary-dark: #c8c8c8;
+  }
+  </style>
+
+</head>
+
+<body class="light">
+<div class="app">
+
+<div class="header-brand">
+  <h1 class="brand-name">PixelForge</h1>
+  <p class="brand-subtitle">TFT & OLED Image Converter</p>
+  <p class="brand-creator">Created by <span>CiferTech</span></p>
+</div>
+
+<div class="social-buttons">
+  <a href="https://patreon.com/cifertech" target="_blank" class="social-btn patreon">
+    <span>🎨</span>
+    <span>Patreon</span>
+  </a>
+  <a href="https://github.com/cifertech/pixelforge" target="_blank" class="social-btn github">
+    <span>⚡</span>
+    <span>GitHub</span>
+  </a>
+  <button id="modeToggle" class="theme-toggle">
+    <span class="theme-icon">🌙</span>
+    <span>Dark Mode</span>
+  </button>
+</div>
+
+<div class="dk-tools-card" id="dkToolsCard">
+  <div class="dk-tools-title">Tools</div>
+  <div class="dk-tools-links">
+    <a class="dk-tool-link active" href="../pixelforge/index.html">🧩 PixelForge</a>
+    <a class="dk-tool-link" href="../bitcanvas-studio/index.html">🎞️ BitCanvas</a>
+    <a class="dk-tool-link" href="../../index.html">↩ DisplayKit</a>
+  </div>
+</div>
+
+<div class="grid">
+
+<div class="card">
+
+  <div class="label">Frames</div>
+  <input type="file" id="fileInput" accept="image/*" multiple>
+
+  <div class="label">Display Mode</div>
+  <select id="displayMode">
+    <option value="tft">TFT (RGB565)</option>
+    <option value="oled1">OLED 1-bit</option>
+    <option value="oled4">OLED 4-bit</option>
+    <option value="oled8">OLED 8-bit</option>
+  </select>
+
+  <div class="label">Size Presets</div>
+  <select id="presetSize">
+    <option value="custom">Custom</option>
+    <option value="240x240">240 × 240</option>
+    <option value="128x128">128 × 128</option>
+    <option value="115x110">115 × 110</option>
+    <option value="100x100">100 × 100</option>
+    <option value="96x64">96 × 64</option>
+    <option value="64x48">64 × 48</option>
+    <option value="32x32">32 × 32</option>
+    <option value="16x16">16 × 16</option>
+  </select>
+
+  <div class="label">Target Size</div>
+  <div class="row">
+    <input type="number" id="w" placeholder="W">
+    <input type="number" id="h" placeholder="H">
+  </div>
+
+  <div class="label">Variable Name</div>
+  <input type="text" id="name" placeholder="e.g. idle, bg, pet">
+
+  <div id="tftOptions">
+    <div class="label">Color Mode</div>
+    <select id="colorMode">
+      <option value="auto">AUTO</option>
+      <option value="rgb">RGB565</option>
+      <option value="bgr">BGR565</option>
+      <option value="rgb_inv">RGB565 invert</option>
+      <option value="bgr_inv">BGR565 invert</option>
+    </select>
+
+    <div class="label">Byte Order</div>
+    <select id="byteMode">
+      <option value="auto">AUTO</option>
+      <option value="noswap">No swap</option>
+      <option value="swap">Swap bytes</option>
+    </select>
+  </div>
+
+  <div id="oledOptions" style="display:none;">
+    <div class="label">OLED Preview Style</div>
+    <select id="previewStyle">
+      <option value="gray">Grayscale</option>
+      <option value="oled">OLED High Contrast</option>
+    </select>
+
+    <div class="label">Preview Scale</div>
+    <select id="previewScale">
+      <option value="1">Exact (1×)</option>
+      <option value="2">2× Upscale</option>
+      <option value="3">3× Upscale</option>
+    </select>
+  </div>
+
+  <button onclick="convert()">Convert</button>
+
+  <div class="preview2x2">
+
+    <div class="preview-item">
+      <div class="small-label">Original</div>
+      <canvas id="canvasOriginal"></canvas>
+    </div>
+
+    <div class="preview-item">
+      <div class="small-label">Scaled</div>
+      <canvas id="canvasScaled"></canvas>
+    </div>
+
+    <div class="preview-item">
+      <div class="small-label">Simulation</div>
+      <canvas id="canvasSim"></canvas>
+    </div>
+
+    <div class="preview-item">
+      <div class="small-label">Animation</div>
+      <canvas id="canvasAnim"></canvas>
+    </div>
+
+  </div>
+
+  <div id="metaInfo" class="meta">Ready.</div>
+
+</div>
+
+<div class="card right">
+  <div class="pill"><span class="pill-dot"></span>Drop into Arduino & #include</div>
+
+  <div class="output-container">
+    <pre id="output">// Result will appear here…</pre>
+  </div>
+
+  <button onclick="downloadHeader()">Download .h File</button>
+
+  <div class="meta">
+    Recommended for TFT:<br>
+    <code>#define TFT_RGB_ORDER TFT_BGR</code><br>
+    <code>tft.setSwapBytes(false);</code>
+  </div>
+</div>
+
+</div>
+
+</div>
+<script>
+  let convertedText = "";
+  let currentName = "";
+  let currentDisplayMode = "tft";
+  let currentBpp = 16;
+  let animTimer = null;
+  let animFramesPreview = [];
+  let animFrameIndex = 0;
+  
+  const canvasOriginal = document.getElementById("canvasOriginal");
+  const canvasScaled   = document.getElementById("canvasScaled");
+  const canvasSim      = document.getElementById("canvasSim");
+  const canvasAnim     = document.getElementById("canvasAnim");
+  
+  const ctxOriginal = canvasOriginal.getContext("2d");
+  const ctxScaled   = canvasScaled.getContext("2d");
+  const ctxSim      = canvasSim.getContext("2d");
+  const ctxAnim     = canvasAnim.getContext("2d");
+  
+  function applyTheme(mode) {
+    document.body.classList.remove("light","dark");
+    document.body.classList.add(mode);
+    const toggle = document.getElementById("modeToggle");
+    const icon = toggle.querySelector(".theme-icon");
+    const textSpan = Array.from(toggle.querySelectorAll("span")).find(s => !s.classList.contains("theme-icon"));
+    if (mode === "dark") {
+      icon.textContent = "☀️";
+      if (textSpan) textSpan.textContent = "Light Mode";
+    } else {
+      icon.textContent = "🌙";
+      if (textSpan) textSpan.textContent = "Dark Mode";
+    }
+  }
+  // Embed mode: let DisplayKit drive theme + hide PixelForge nav/buttons
+  const params = new URLSearchParams(window.location.search);
+  const isEmbedded = params.get("embed") === "1";
+  const themeParam = params.get("theme");
+
+  if (isEmbedded) {
+    document.body.classList.add("embedded");
+  }
+
+  const savedTheme = localStorage.getItem("theme") || localStorage.getItem("mode");
+  const initialTheme =
+    themeParam === "dark" || themeParam === "light"
+      ? themeParam
+      : (savedTheme === "dark" || savedTheme === "light" ? savedTheme : "dark");
+  applyTheme(initialTheme);
+
+  // Live theme sync from DisplayKit (no reload)
+  window.addEventListener("message", (event) => {
+    const data = event && event.data;
+    if (data && data.type === "requestExport") {
+      // Send the latest export text back to DisplayKit
+      const out = (convertedText && convertedText.trim().length)
+        ? convertedText
+        : (document.getElementById("output")?.innerText || "");
+      window.parent?.postMessage({ type: "toolExport", tool: "pixelforge", text: out }, "*");
+      return;
+    }
+    if (!data || data.type !== "displaykitTheme") return;
+    const t = data.theme;
+    if (t === "dark" || t === "light") {
+      applyTheme(t);
+      // Avoid fighting the host: don't persist embed-driven theme in localStorage
+      if (!isEmbedded) localStorage.setItem("mode", t);
+    }
+  });
+  document.getElementById("modeToggle").onclick=()=>{
+    const next=document.body.classList.contains("dark")?"light":"dark";
+    applyTheme(next);
+    localStorage.setItem("mode", next);
+    localStorage.setItem("theme", next);
+  };
+  
+  const tftOpts=document.getElementById("tftOptions");
+  const oledOpts=document.getElementById("oledOptions");
+  document.getElementById("displayMode").addEventListener("change",()=>{
+    const m=document.getElementById("displayMode").value;
+    if(m==="tft"){tftOpts.style.display="block";oledOpts.style.display="none";}
+    else{tftOpts.style.display="none";oledOpts.style.display="block";}
+  });
+  
+  document.getElementById("presetSize").addEventListener("change",()=>{
+    const val=document.getElementById("presetSize").value;
+    const w=document.getElementById("w");
+    const h=document.getElementById("h");
+    if(val==="custom"){w.disabled=h.disabled=false;w.value=h.value="";return;}
+    const [W,H]=val.split("x").map(Number);
+    w.value=W;h.value=H; w.disabled=h.disabled=true;
+  });
+  
+  function rgb888ToRgb565(r,g,b){
+    return ((r>>3)<<11)|((g>>2)<<5)|(b>>3);
+  }
+  const gray = (r,g,b) => Math.round(0.299*r+0.587*g+0.114*b);
+  
+  function clearAnim(){ if(animTimer)clearInterval(animTimer); animTimer=null;}
+  
+  function startAnim(frames,w,h){
+    clearAnim();
+    if(!frames.length)return;
+    canvasAnim.width=w;
+    canvasAnim.height=h;
+    animFramesPreview=frames;
+    animFrameIndex=0;
+    animTimer=setInterval(()=>{
+      ctxAnim.putImageData(animFramesPreview[animFrameIndex],0,0);
+      animFrameIndex=(animFrameIndex+1)%animFramesPreview.length;
+    },130);
+  }
+  
+  function loadAndProcessImage(file,targetW,targetH,cb){
+    const img=new Image();
+    const r=new FileReader();
+    r.onload=e=>{
+      img.onload=()=>{
+        if(!canvasOriginal.width){
+          canvasOriginal.width=img.width;
+          canvasOriginal.height=img.height;
+          ctxOriginal.drawImage(img,0,0);
+        }
+        canvasScaled.width=targetW;
+        canvasScaled.height=targetH;
+        ctxScaled.drawImage(img,0,0,targetW,targetH);
+        cb(targetW,targetH,ctxScaled.getImageData(0,0,targetW,targetH));
+      };
+      img.src=e.target.result;
+    };
+    r.readAsDataURL(file);
+  }
+  
+  function convert(){
+    const files=document.getElementById("fileInput").files;
+    if(!files.length)return alert("Select frames");
+  
+    currentName=document.getElementById("name").value||"sprite";
+    const mode=document.getElementById("displayMode").value;
+    currentBpp = mode==="tft"?16 : mode==="oled1"?1 : mode==="oled4"?4 : 8;
+  
+    const W=parseInt(document.getElementById("w").value);
+    const H=parseInt(document.getElementById("h").value);
+  
+    canvasOriginal.width=canvasOriginal.height=0;
+    canvasScaled.width=canvasScaled.height=0;
+    canvasSim.width=canvasSim.height=0;
+    canvasAnim.width=canvasAnim.height=0;
+    clearAnim();
+  
+    let outArr=[];
+    let prevArr=[];
+    let idx=0;
+  
+    function next(){
+      if(idx>=files.length){
+        buildHeader(currentName,outArr);
+        if(outArr.length){
+          startAnim(prevArr,outArr[0].w,outArr[0].h);
+          metaInfo.innerText=`Mode: ${mode}, Frames: ${outArr.length}, Size: ${outArr[0].w}×${outArr[0].h}`;
+        }
+        return;
+      }
+  
+      const file=files[idx];
+      const frameName=files.length===1?currentName:`${currentName}_${idx}`;
+  
+      loadAndProcessImage(file,W,H,(w,h,imageData)=>{
+        let out={name:frameName,w,h,pixels:[]};
+        let preview=new ImageData(w,h);
+        if(mode==="tft") convertTFT(imageData,out,preview);
+        else convertOLED(imageData,out,preview,mode);
+        outArr.push(out);
+        prevArr.push(preview);
+        idx++;
+        next();
+      });
+    }
+    next();
+  }
+  
+  function convertTFT(img,out,pv){
+    const d=img.data, pd=pv.data;
+    let mode=document.getElementById("colorMode").value;
+    let bm=document.getElementById("byteMode").value;
+    if(mode==="auto")mode="rgb";
+    if(bm==="auto")bm="noswap";
+  
+    for(let i=0;i<d.length;i+=4){
+      let r=d[i],g=d[i+1],b=d[i+2];
+      if(mode.startsWith("bgr")){let t=r;r=b;b=t;}
+      if(mode.endsWith("inv")){r=255-r;g=255-g;b=255-b;}
+  
+      let v=rgb888ToRgb565(r,g,b);
+      if(bm==="swap")v=((v&0xFF)<<8)|(v>>8);
+      out.pixels.push(v);
+  
+      const r5=(v>>11)&0x1F, g6=(v>>5)&0x3F, b5=v&0x1F;
+      pd[i]=r5<<3; pd[i+1]=g6<<2; pd[i+2]=b5<<3; pd[i+3]=255;
+    }
+  
+    canvasSim.width=out.w;
+    canvasSim.height=out.h;
+    ctxSim.putImageData(pv,0,0);
+  }
+  
+  function convertOLED(img,out,pv,mode){
+    const d=img.data, pd=pv.data;
+    const style=document.getElementById("previewStyle").value;
+    const scale=parseInt(document.getElementById("previewScale").value);
+  
+    const w=img.width, h=img.height;
+  
+    let raw=new ImageData(w,h);
+    let rd=raw.data;
+  
+    if(mode==="oled1"){
+      let byte=0,bit=0;
+      for(let p=0;p<d.length/4;p++){
+        const i=p*4;
+        const g=gray(d[i],d[i+1],d[i+2]);
+        const on=g>=128?1:0;
+        byte|=(on<<(7-bit));
+        bit++;
+        const px=style==="oled"?on*255:g;
+        rd[i]=rd[i+1]=rd[i+2]=px; rd[i+3]=255;
+        if(bit===8){out.pixels.push(byte);byte=0;bit=0;}
+      }
+    }
+  
+    else if(mode==="oled4"){
+      let byte=0,half=0;
+      for(let p=0;p<d.length/4;p++){
+        const i=p*4;
+        let g=Math.round(gray(d[i],d[i+1],d[i+2])/17);
+        if(g<0)g=0;if(g>15)g=15;
+        if(!half){byte=(g<<4);half=1;}
+        else{byte|=g;out.pixels.push(byte);byte=0;half=0;}
+        const px=style==="oled"?(g>=8?255:0):g*17;
+        rd[i]=rd[i+1]=rd[i+2]=px; rd[i+3]=255;
+        if(p===d.length/4-1 && half===1)out.pixels.push(byte);
+      }
+    }
+  
+    else {
+      for(let p=0;p<d.length/4;p++){
+        const i=p*4;
+        const g=gray(d[i],d[i+1],d[i+2]);
+        out.pixels.push(g);
+        const px=style==="oled"?(g>=128?255:0):g;
+        rd[i]=rd[i+1]=rd[i+2]=px; rd[i+3]=255;
+      }
+    }
+  
+    canvasSim.width=w*scale;
+    canvasSim.height=h*scale;
+    let tmp=document.createElement("canvas");
+    tmp.width=w; tmp.height=h;
+    tmp.getContext("2d").putImageData(raw,0,0);
+    ctxSim.imageSmoothingEnabled=false;
+    ctxSim.drawImage(tmp,0,0,w*scale,h*scale);
+  }
+  
+  function buildHeader(base,frames){
+    const type=currentDisplayMode==="tft"?"uint16_t":"uint8_t";
+    let out="#pragma once\n#include <stdint.h>\n#include <pgmspace.h>\n\n";
+    out+=`// Generated by PixelForge v3.4.3 – Mode: ${currentDisplayMode}\n`;
+    out+=`const uint16_t ${base}_width=${frames[0].w};\n`;
+    out+=`const uint16_t ${base}_height=${frames[0].h};\n`;
+    if(type==="uint8_t") out+=`const uint8_t ${base}_bpp=${currentBpp};\n\n`;
+  
+    frames.forEach((f,i)=>{
+      const nm=frames.length>1?`${base}_${i}`:base;
+      out+=`const ${type} ${nm}[] PROGMEM={\n  `;
+      const per=type==="uint16_t"?12:16;
+      f.pixels.forEach((v,j)=>{
+        out+="0x"+v.toString(16).padStart(type==="uint16_t"?4:2,"0").toUpperCase();
+        if(j<f.pixels.length-1)out+=", ";
+        if((j+1)%per===0)out+="\n  ";
+      });
+      out+="\n};\n\n";
+    });
+  
+    if(frames.length>1){
+      out+=`const ${type}* const ${base}_frames[] PROGMEM={\n`;
+      frames.forEach((f,i)=> out+=`  ${base}_${i},\n`);
+      out+="};\n";
+    }
+  
+    document.getElementById("output").innerText=out;
+    convertedText=out;
+  }
+  
+  function downloadHeader(){
+    if(!convertedText)return alert("Nothing to download");
+    const blob=new Blob([convertedText],{type:"text/plain"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=currentName+".h";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  </script>
+</body>
+</html>

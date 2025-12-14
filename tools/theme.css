@@ -1,0 +1,150 @@
+:root {
+  /* DisplayKit theme tokens (light default) */
+  --bg-primary: #f8f8f8;
+  --bg-secondary: #f0f0f0;
+  --bg-tertiary: #e8e8e8;
+  --border-color: #d0d0d0;
+  --text-primary: #2a2a2a;
+  --text-secondary: #555555;
+  --text-tertiary: #777777;
+  --input-bg: #f8f8f8;
+  --input-border: #c0c0c0;
+  --btn-primary: #FF6D1F;
+  --btn-primary-hover: #ff8533;
+  --btn-secondary: #e8e8e8;
+  --btn-secondary-border: #c8c8c8;
+  --btn-danger: #f97373;
+  --outline-color: #FF6D1F;
+  --glow-primary: rgba(255, 109, 31, 0.08);
+  --glow-secondary: rgba(255, 109, 31, 0.12);
+  --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* Scrollbars (Windows/Chrome default is bright; theme them) */
+  --scrollbar-track: rgba(0, 0, 0, 0.06);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.22);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.34);
+}
+
+/* Dark theme overrides (match DisplayKit) */
+html[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #252525;
+  --bg-tertiary: #303030;
+  --border-color: #404040;
+  --text-primary: #f0f0f0;
+  --text-secondary: #c8c8c8;
+  --text-tertiary: #909090;
+  --input-bg: #1a1a1a;
+  --input-border: #454545;
+  --btn-secondary: #303030;
+  --btn-secondary-border: #404040;
+  --glow-primary: rgba(255, 109, 31, 0.25);
+  --glow-secondary: rgba(255, 109, 31, 0.4);
+  --card-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+
+  --scrollbar-track: rgba(255, 255, 255, 0.06);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+}
+
+/* Minimal cross-tool defaults (kept intentionally small to avoid layout conflicts) */
+html, body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Cross-tool scrollbar theming */
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); /* Firefox */
+}
+
+/* Chromium/WebKit */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid var(--scrollbar-track);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* Shared "Tools" navigation card used on standalone tool pages */
+.dk-tools-card {
+  border: 2px solid rgba(255, 109, 31, 0.45);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 109, 31, 0.14),
+    rgba(255, 109, 31, 0.06)
+  );
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(255, 109, 31, 0.10);
+  border-radius: 16px;
+  padding: 14px 14px;
+}
+
+.dk-tools-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--btn-primary);
+  margin: 0 0 10px 0;
+}
+
+.dk-tools-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dk-tool-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 109, 31, 0.18);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+html[data-theme="dark"] .dk-tool-link {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.dk-tool-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 109, 31, 0.55);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+html[data-theme="dark"] .dk-tool-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dk-tool-link.active {
+  border-color: rgba(255, 109, 31, 0.65);
+  box-shadow: 0 0 0 1px rgba(255, 109, 31, 0.18);
+}
+
+.dk-tool-link::after {
+  content: "↗";
+  opacity: 0.7;
+  margin-left: 2px;
+}
+
+
