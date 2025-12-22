@@ -1,0 +1,46 @@
+// Auto-generated icon manifest for DisplayKit.
+// This file exists to support running DisplayKit via file:// (where fetch() to local JSON is often blocked).
+// When hosted (http/https), the app can also load icons/manifest.json.
+window.DISPLAYKIT_ICON_MANIFEST = {
+  version: 1,
+  basePath: "icons/",
+  files: [
+    "16x16/antenna.png",
+    "16x16/bluetooth.png",
+    "16x16/bluetooth_2.png",
+    "16x16/brain.png",
+    "16x16/character.png",
+    "16x16/dialog.png",
+    "16x16/eye.png",
+    "16x16/eye_2.png",
+    "16x16/gear.png",
+    "16x16/graph.png",
+    "16x16/key.png",
+    "16x16/led.png",
+    "16x16/list.png",
+    "16x16/no_signal.png",
+    "16x16/nuke.png",
+    "16x16/person.png",
+    "16x16/question.png",
+    "16x16/recycle.png",
+    "16x16/reset.png",
+    "16x16/satellite.png",
+    "16x16/satellite_2.png",
+    "16x16/save.png",
+    "16x16/save_2.png",
+    "16x16/sdcard.png",
+    "16x16/sdcard_null.png",
+    "16x16/signal.png",
+    "16x16/signal_2.png",
+    "16x16/signal_3.png",
+    "16x16/skull.png",
+    "16x16/stat.png",
+    "16x16/sword.png",
+    "16x16/temp.png",
+    "16x16/waves.png",
+    "16x16/wifi_1.png",
+    "16x16/wifi_2.png"
+  ]
+};
+
+

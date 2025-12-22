@@ -35,6 +35,60 @@
       </a>
     </div>
 
+    <div class="sidebar-card section-card" id="uiExamplesCard">
+      <div class="sidebar-card-title">UI Examples</div>
+      <div class="mini-hint">Add a ready-made screen layout (non-destructive).</div>
+      <div class="ui-examples-tabs" role="tablist" aria-label="UI example presets">
+        <button class="ui-tab-btn" type="button" id="uiExamplesTabTft" role="tab" aria-selected="true" data-ui-examples-tab="tft">
+          TFT
+        </button>
+        <button class="ui-tab-btn" type="button" id="uiExamplesTabOled" role="tab" aria-selected="false" data-ui-examples-tab="oled">
+          OLED
+        </button>
+      </div>
+      <div class="example-list" id="uiExamplesList"></div>
+      <div class="ui-examples-pager" aria-label="UI examples pagination">
+        <button class="btn small secondary" type="button" id="uiExamplesPrevBtn">Prev</button>
+        <span class="pill outline small" id="uiExamplesPagePill">Page 1 / 1</span>
+        <button class="btn small secondary" type="button" id="uiExamplesNextBtn">Next</button>
+      </div>
+    </div>
+
+    <div class="sidebar-card section-card" id="iconListCard">
+      <div class="sidebar-card-title">Icon List</div>
+      <div class="icon-search-row">
+        <input type="text" id="iconSearch" placeholder="Search icons (wifi, gear, play...)" />
+        <button class="btn small secondary" type="button" id="clearIconSearch" title="Clear search">Clear</button>
+      </div>
+      <div class="icon-toolbar">
+        <div class="icon-toolbar-left">
+          <label for="iconSizeFilter" class="sr-only">Icon size</label>
+          <select id="iconSizeFilter" title="Filter by icon size">
+            <option value="all">All sizes</option>
+            <option value="16x16">16x16</option>
+            <option value="32x32">32x32</option>
+          </select>
+          <span class="pill outline small" id="iconCountPill">0 icons</span>
+        </div>
+        <button class="btn small secondary" type="button" id="refreshIconsBtn" title="Reload icon manifest">Refresh</button>
+      </div>
+      <div class="icon-actions-row">
+        <button class="btn small secondary" type="button" id="exportIconsTftBtn" title="Export all icons as RGB565 PROGMEM arrays (TFT_eSPI)">
+          Export TFT (RGB565)
+        </button>
+        <button class="btn small secondary" type="button" id="exportIconsU8g2Btn" title="Export all icons as XBM PROGMEM arrays (U8g2)">
+          Export U8g2 (XBM)
+        </button>
+      </div>
+      <div class="icon-grid" id="iconGrid" aria-label="Icon list"></div>
+      <div class="icon-pager" aria-label="Icon list pagination">
+        <button class="btn small secondary" type="button" id="iconPrevBtn">Prev</button>
+        <span class="pill outline small" id="iconPagePill">Page 1 / 1</span>
+        <button class="btn small secondary" type="button" id="iconNextBtn">Next</button>
+      </div>
+      <div class="mini-hint" id="iconHint">Click an icon to add it as an element. Shift+Click also copies its path.</div>
+    </div>
+
     <div class="sidebar-card note section-card">
       <div class="sidebar-card-title">Workflow tips</div>
       <ul>
@@ -42,167 +96,6 @@
         <li>Duplicate elements to iterate fast.</li>
         <li>Export JSON often for versioning.</li>
       </ul>
-    </div>
-
-    <div class="section-title">Display</div>
-    <div class="prop-group">
-      <div class="prop-row">
-        <div>
-          <label for="dispWidth">Width</label>
-          <input type="number" id="dispWidth" value="240" min="1" />
-        </div>
-        <div>
-          <label for="dispHeight">Height</label>
-          <input type="number" id="dispHeight" value="320" min="1" />
-        </div>
-      </div>
-      <div class="prop-row">
-        <div>
-          <label for="displayDriver">Driver</label>
-          <select id="displayDriver">
-            <option value="tft">TFT_eSPI</option>
-            <option value="u8g2">U8g2 OLED</option>
-          </select>
-        </div>
-      </div>
-      <button class="btn small secondary icon-btn-ghost" id="applyRes" title="Apply resolution">
-        <span>Apply</span>
-      </button>
-    </div>
-
-    <!-- TFT Display Settings -->
-    <div id="tftSettings" class="display-settings">
-      <div class="section-title">TFT Display Settings</div>
-      <div class="prop-group">
-        <div class="prop-row">
-          <div>
-            <label for="tftRotation">Rotation</label>
-            <select id="tftRotation">
-              <option value="0">0° (Portrait)</option>
-              <option value="1">90° (Landscape)</option>
-              <option value="2">180° (Portrait)</option>
-              <option value="3">270° (Landscape)</option>
-            </select>
-          </div>
-          <div>
-            <label for="tftColorDepth">Color Depth</label>
-            <select id="tftColorDepth">
-              <option value="16">16-bit RGB565</option>
-              <option value="18">18-bit RGB666</option>
-              <option value="24">24-bit RGB888</option>
-            </select>
-          </div>
-        </div>
-        <div class="prop-row">
-          <div>
-            <label for="tftBacklight">Backlight Control</label>
-            <select id="tftBacklight">
-              <option value="none">None</option>
-              <option value="pwm">PWM Pin</option>
-              <option value="manual">Manual</option>
-            </select>
-          </div>
-          <div>
-            <label for="tftTouch">Touch Support</label>
-            <select id="tftTouch">
-              <option value="none">No Touch</option>
-              <option value="resistive">Resistive</option>
-              <option value="capacitive">Capacitive</option>
-            </select>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- OLED Display Settings -->
-    <div id="oledSettings" class="display-settings">
-      <div class="section-title">OLED Display Settings</div>
-      <div class="prop-group">
-        <div class="prop-row">
-          <div>
-            <label for="u8g2Preset">U8g2 Display Model</label>
-            <select id="u8g2Preset">
-
-            </select>
-          </div>
-          <div>
-            <label for="oledRotation">Rotation</label>
-            <select id="oledRotation">
-              <option value="0">0° (Normal)</option>
-              <option value="1">90° (Clockwise)</option>
-              <option value="2">180° (Upside Down)</option>
-              <option value="3">270° (Counter-clockwise)</option>
-            </select>
-          </div>
-        </div>
-        <div class="prop-row">
-          <div>
-            <label for="oledContrast">Contrast (0-255)</label>
-            <input type="range" id="oledContrast" min="0" max="255" value="127" />
-            <span id="oledContrastValue">127</span>
-          </div>
-          <div>
-            <label for="oledFlipMode">Flip Mode</label>
-            <select id="oledFlipMode">
-              <option value="none">Normal</option>
-              <option value="horizontal">Horizontal Flip</option>
-              <option value="vertical">Vertical Flip</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-        </div>
-        <div class="prop-row">
-          <div>
-            <label for="oledFontMode">Font Rendering</label>
-            <select id="oledFontMode">
-              <option value="transparent">Transparent Background</option>
-              <option value="solid">Solid Background</option>
-              <option value="inverse">Inverse Colors</option>
-            </select>
-          </div>
-          <div>
-            <label for="oledPowerSave">Power Save Mode</label>
-            <select id="oledPowerSave">
-              <option value="off">Always On</option>
-              <option value="auto">Auto Sleep</option>
-              <option value="manual">Manual Control</option>
-            </select>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section-title">Screens</div>
-    <div class="prop-group">
-      <label for="screenSelect">Current screen</label>
-      <div class="prop-row">
-        <div>
-          <select id="screenSelect"></select>
-        </div>
-        <button class="btn small secondary icon-btn-ghost" id="addScreenBtn" title="Add screen">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <line x1="12" y1="6" x2="12" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-            <line x1="6" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="prop-group">
-      <label for="screenFnName">Function name</label>
-      <div class="prop-row fn-row">
-        <div>
-          <input type="text" id="screenFnName" placeholder="drawHomeScreen" />
-        </div>
-        <button class="btn small secondary icon-btn-ghost" id="deleteScreenBtn" title="Delete screen">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <polyline points="9,6 10,4 14,4 15,6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-            <rect x="7" y="6" width="10" height="12" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
-            <line x1="10" y1="10" x2="10" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-            <line x1="14" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-          </svg>
-        </button>
-      </div>
     </div>
 
     <div class="sidebar-card section-card">
@@ -254,6 +147,16 @@
     <div class="sidebar-card section-card">
       <div class="sidebar-card-title">UI Elements</div>
       <div class="btn-group">
+        <button class="btn small chip-btn" data-add="text" title="Text">
+          <span class="icon-box ui">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
+              <path d="M9 11h9" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
+              <path d="M9 15h7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
+            </svg>
+          </span>
+          <span class="chip-label">Text</span>
+        </button>
         <button class="btn small chip-btn" data-add="label" title="Label">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -327,66 +230,6 @@
         </button>
       </div>
     </div>
-
-      <div class="section-title">
-        Scene
-        <span style="font-size: 10px; font-weight: normal; opacity: 0.7; margin-left: 8px;">
-          Tab: cycle elements • Ctrl+D: duplicate • Arrows: move • Ctrl+1-6: align
-        </span>
-      </div>
-    <div class="sidebar-card section-card">
-      <div class="sidebar-card-title">Background</div>
-      <div class="bg-color-row">
-        <div class="bg-presets">
-          <button class="bg-chip" data-bg-color="#000000">
-            <span class="bg-chip-swatch" style="background:#000000"></span>
-            <span>Black</span>
-          </button>
-          <button class="bg-chip" data-bg-color="#ffffff">
-            <span class="bg-chip-swatch" style="background:#ffffff"></span>
-            <span>White</span>
-          </button>
-          <button class="bg-chip" data-bg-color="#111827">
-            <span class="bg-chip-swatch" style="background:#111827"></span>
-            <span>Dark gray</span>
-          </button>
-          <button class="bg-chip" data-bg-color="#e5e7eb">
-            <span class="bg-chip-swatch" style="background:#e5e7eb"></span>
-            <span>Light gray</span>
-          </button>
-          <button class="bg-chip bg-chip-custom" id="bgColorCustom">
-            <span class="bg-chip-swatch" style="background:conic-gradient(red, orange, yellow, green, cyan, blue, magenta, red)"></span>
-            <span>Custom</span>
-          </button>
-        </div>
-      </div>
-      <input type="color" id="bgColor" value="#000000" style="display:none" />
-    </div>
-
-    <div class="section-title">Grid & Snap</div>
-    <div class="prop-group">
-      <label class="toggle-label">
-        <input type="checkbox" id="snapCheckbox" class="toggle-input" />
-        Snap to grid
-      </label>
-      <div class="prop-row">
-        <div>
-          <label for="gridSize">Grid size (px)</label>
-          <input type="number" id="gridSize" value="4" min="1" />
-        </div>
-      </div>
-    </div>
-
-    <div class="prop-group">
-      <label class="toggle-label">
-        <input type="checkbox" id="useSpriteCheckbox" class="toggle-input" />
-        Use sprite (TFT_eSprite) for screens
-      </label>
-    </div>
-
-    <div class="prop-group">
-      <button class="btn secondary small" id="clearAll">Clear all (screen)</button>
-    </div>
   </div>
 
   <div class="main">
@@ -430,7 +273,236 @@
         </div>
       </div>
       <div class="properties">
-        <div class="section-title">Selected Element</div>
+        <div class="props-section">
+          <div class="settings-block" id="settingsProjectBlock">
+            <div class="section-title" id="settingsProjectTitle">Project</div>
+            <div class="mini-hint">Project settings live here (screens, display, scene, grid).</div>
+          </div>
+
+          <div class="settings-block" id="settingsDisplayBlock">
+            <div class="section-title" id="settingsDisplayTitle">Display</div>
+            <div class="prop-group">
+              <div class="prop-row">
+                <div>
+                  <label for="dispWidth">Width</label>
+                  <input type="number" id="dispWidth" value="240" min="1" />
+                </div>
+                <div>
+                  <label for="dispHeight">Height</label>
+                  <input type="number" id="dispHeight" value="320" min="1" />
+                </div>
+              </div>
+              <div class="prop-row">
+                <div>
+                  <label for="displayDriver">Driver</label>
+                  <select id="displayDriver">
+                    <option value="tft">TFT_eSPI</option>
+                    <option value="u8g2">U8g2 OLED</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn small secondary icon-btn-ghost" id="applyRes" title="Apply resolution">
+                <span>Apply</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- TFT Display Settings -->
+          <div id="tftSettings" class="display-settings settings-block">
+            <div class="section-title" id="settingsTftTitle">TFT Display Settings</div>
+            <div class="prop-group">
+              <div class="prop-row">
+                <div>
+                  <label for="tftRotation">Rotation</label>
+                  <select id="tftRotation">
+                    <option value="0">0° (Portrait)</option>
+                    <option value="1">90° (Landscape)</option>
+                    <option value="2">180° (Portrait)</option>
+                    <option value="3">270° (Landscape)</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="tftColorDepth">Color Depth</label>
+                  <select id="tftColorDepth">
+                    <option value="16">16-bit RGB565</option>
+                    <option value="18">18-bit RGB666</option>
+                    <option value="24">24-bit RGB888</option>
+                  </select>
+                </div>
+              </div>
+              <div class="prop-row">
+                <div>
+                  <label for="tftBacklight">Backlight Control</label>
+                  <select id="tftBacklight">
+                    <option value="none">None</option>
+                    <option value="pwm">PWM Pin</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="tftTouch">Touch Support</label>
+                  <select id="tftTouch">
+                    <option value="none">No Touch</option>
+                    <option value="resistive">Resistive</option>
+                    <option value="capacitive">Capacitive</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- OLED Display Settings -->
+          <div id="oledSettings" class="display-settings settings-block">
+            <div class="section-title" id="settingsOledTitle">OLED Display Settings</div>
+            <div class="prop-group">
+              <div class="prop-row">
+                <div>
+                  <label for="u8g2Preset">U8g2 Display Model</label>
+                  <select id="u8g2Preset"></select>
+                </div>
+                <div>
+                  <label for="oledRotation">Rotation</label>
+                  <select id="oledRotation">
+                    <option value="0">0° (Normal)</option>
+                    <option value="1">90° (Clockwise)</option>
+                    <option value="2">180° (Upside Down)</option>
+                    <option value="3">270° (Counter-clockwise)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="prop-row">
+                <div>
+                  <label for="oledContrast">Contrast (0-255)</label>
+                  <input type="range" id="oledContrast" min="0" max="255" value="127" />
+                  <span id="oledContrastValue">127</span>
+                </div>
+                <div>
+                  <label for="oledFlipMode">Flip Mode</label>
+                  <select id="oledFlipMode">
+                    <option value="none">Normal</option>
+                    <option value="horizontal">Horizontal Flip</option>
+                    <option value="vertical">Vertical Flip</option>
+                    <option value="both">Both</option>
+                  </select>
+                </div>
+              </div>
+              <div class="prop-row">
+                <div>
+                  <label for="oledFontMode">Font Rendering</label>
+                  <select id="oledFontMode">
+                    <option value="transparent">Transparent Background</option>
+                    <option value="solid">Solid Background</option>
+                    <option value="inverse">Inverse Colors</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="oledPowerSave">Power Save Mode</label>
+                  <select id="oledPowerSave">
+                    <option value="off">Always On</option>
+                    <option value="auto">Auto Sleep</option>
+                    <option value="manual">Manual Control</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-block" id="settingsScreensBlock">
+            <div class="section-title" id="settingsScreensTitle">Screens</div>
+            <div class="prop-group">
+              <label for="screenSelect">Current screen</label>
+              <div class="prop-row">
+                <div>
+                  <select id="screenSelect"></select>
+                </div>
+                <button class="btn small secondary icon-btn-ghost" id="addScreenBtn" title="Add screen">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <line x1="12" y1="6" x2="12" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <line x1="6" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="prop-group">
+              <label for="screenFnName">Function name</label>
+              <div class="prop-row fn-row">
+                <div>
+                  <input type="text" id="screenFnName" placeholder="drawHomeScreen" />
+                </div>
+                <button class="btn small secondary icon-btn-ghost" id="deleteScreenBtn" title="Delete screen">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <polyline points="9,6 10,4 14,4 15,6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                    <rect x="7" y="6" width="10" height="12" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+                    <line x1="10" y1="10" x2="10" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <line x1="14" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-block" id="settingsSceneBlock">
+            <div class="section-title" id="settingsSceneTitle">Scene</div>
+            <div class="prop-group">
+              <label>Background</label>
+              <div class="bg-color-row">
+                <div class="bg-presets">
+                  <button class="bg-chip" data-bg-color="#000000">
+                    <span class="bg-chip-swatch" style="background:#000000"></span>
+                    <span>Black</span>
+                  </button>
+                  <button class="bg-chip" data-bg-color="#ffffff">
+                    <span class="bg-chip-swatch" style="background:#ffffff"></span>
+                    <span>White</span>
+                  </button>
+                  <button class="bg-chip" data-bg-color="#111827">
+                    <span class="bg-chip-swatch" style="background:#111827"></span>
+                    <span>Dark gray</span>
+                  </button>
+                  <button class="bg-chip" data-bg-color="#e5e7eb">
+                    <span class="bg-chip-swatch" style="background:#e5e7eb"></span>
+                    <span>Light gray</span>
+                  </button>
+                  <button class="bg-chip bg-chip-custom" id="bgColorCustom">
+                    <span class="bg-chip-swatch" style="background:conic-gradient(red, orange, yellow, green, cyan, blue, magenta, red)"></span>
+                    <span>Custom</span>
+                  </button>
+                </div>
+              </div>
+              <input type="color" id="bgColor" value="#000000" style="display:none" />
+            </div>
+          </div>
+
+          <div class="settings-block" id="settingsGridBlock">
+            <div class="section-title" id="settingsGridTitle">Grid & Snap</div>
+            <div class="prop-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="snapCheckbox" class="toggle-input" />
+                Snap to grid
+              </label>
+              <div class="prop-row">
+                <div>
+                  <label for="gridSize">Grid size (px)</label>
+                  <input type="number" id="gridSize" value="4" min="1" />
+                </div>
+              </div>
+            </div>
+
+            <div class="prop-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="useSpriteCheckbox" class="toggle-input" />
+                Use sprite (TFT_eSprite) for screens
+              </label>
+            </div>
+
+            <div class="prop-group">
+              <button class="btn secondary small" id="clearAll">Clear all (screen)</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title" id="selectedElementTitle">Selected Element</div>
         <div id="noSelection">No element selected</div>
         <div id="propsPanel" style="display: none">
           <div class="prop-group">
@@ -473,7 +545,7 @@
           </div>
 
           <div class="prop-group" id="fontGroup">
-            <label for="propFont">Font (U8g2)</label>
+            <label for="propFont" id="propFontLabel">Font</label>
             <select id="propFont"></select>
           </div>
 
@@ -528,6 +600,23 @@
                 <select id="propActionTarget"></select>
               </div>
             </div>
+          </div>
+
+          <div class="prop-group" id="iconTintGroup" style="display:none;">
+            <div class="fn-label-row">
+              <label>Icon tint</label>
+              <label class="toggle-label" title="Tint recolors PNG icons using their transparency (best for monochrome icons)">
+                <input type="checkbox" id="propIconTintEnabled" class="toggle-input" />
+                Enable
+              </label>
+            </div>
+            <div class="prop-row color-row">
+              <div class="pill">
+                <input type="color" id="propIconTintColor" value="#ffffff" />
+                <span>Tint</span>
+              </div>
+            </div>
+            <div class="mini-hint">Tip: in OLED mode, tint helps icons match the cyan display style.</div>
           </div>
 
           <div class="prop-group">
@@ -619,6 +708,8 @@
       </div>
     </div>
   </div>
+  <!-- Icon manifest: supports file:// usage (no fetch required) -->
+  <script src="icons/manifest.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

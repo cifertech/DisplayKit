@@ -875,7 +875,8 @@ a.btn {
     linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
   background-size: var(--pixel-size, 8px) var(--pixel-size, 8px);
   pointer-events: none;
-  z-index: 0;
+  /* Keep grid above OLED canvas but below selection overlays */
+  z-index: 2;
   opacity: 0.6;
 }
 
@@ -923,6 +924,12 @@ a.btn {
   z-index: 20;
 }
 
+/* Text elements are just text (no box/border) */
+.ui-element[type="text"] {
+  border: none;
+  box-shadow: none;
+}
+
 /* OLED-specific element styles - Aggressive Pixelation */
 .ui-element.oled-element {
   image-rendering: pixelated !important;
@@ -933,6 +940,12 @@ a.btn {
   background-size: 1px 1px !important;
   border-radius: 0 !important; /* Pixel-perfect corners */
   color: #0088aa; /* Default OLED cyan border color */
+}
+
+/* OLED: text should not inherit the forced border */
+.ui-element.oled-element[type="text"] {
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .ui-element.oled-element * {
@@ -948,6 +961,18 @@ a.btn {
   border-image: none !important;
   -webkit-font-smoothing: none !important;
   -moz-osx-font-smoothing: none !important;
+}
+
+/* OLED: media elements (images/icons) should NOT use the 1px tiled background rules */
+.ui-element.oled-element[type="image"],
+.ui-element.oled-element[type="icon"] {
+  background-repeat: no-repeat !important;
+  background-size: contain !important;
+  background-position: center !important;
+  border-radius: 4px !important;
+  border: none !important; /* no cyan outline around media */
+  /* Do NOT pixelate icons/images in OLED mode */
+  image-rendering: auto !important;
 }
 
 .ui-element.oled-element:hover:not(.selected) {
@@ -1144,6 +1169,39 @@ a.btn {
 .properties #propsPanel .prop-row {
   gap: 10px;
   margin-bottom: 10px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Right sidebar: settings blocks                                              */
+/* -------------------------------------------------------------------------- */
+
+.properties .settings-block {
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  padding: 10px;
+  background: var(--bg-primary);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+}
+
+.properties .settings-block + .settings-block {
+  margin-top: 10px;
+}
+
+/* Keep the title inside the block tight */
+.properties .settings-block > .section-title {
+  margin: 0 0 8px 0;
+}
+
+/* Avoid double-card look: inside a settings-block, prop-groups become "flat" */
+.properties .props-section .settings-block .prop-group {
+  margin: 0 0 10px 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.properties .props-section .settings-block .prop-group:last-child {
+  margin-bottom: 0;
 }
 
 /* Color pills inside the sidebar: align nicely + feel clickable */
@@ -1522,6 +1580,231 @@ a.btn {
 }
 .sidebar-card.note {
   background: var(--bg-secondary);
+}
+
+/* -------------------------------------------------------------------------- */
+/* UI Examples + Icon List (sidebar extras)                                   */
+/* -------------------------------------------------------------------------- */
+
+.mini-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
+.example-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-examples-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+.ui-examples-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ui-examples-pager .btn {
+  flex: 0 0 auto;
+}
+
+.ui-examples-pager .pill {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
+}
+
+.ui-tab-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ui-tab-btn:hover {
+  border-color: rgba(255, 109, 31, 0.35);
+  color: var(--text-primary);
+}
+
+.ui-tab-btn.active {
+  background: rgba(255, 109, 31, 0.16);
+  border-color: rgba(255, 109, 31, 0.55);
+  color: var(--btn-primary);
+}
+
+button.link-chip {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.8);
+  cursor: pointer;
+  text-align: left;
+}
+
+[data-theme="dark"] button.link-chip {
+  background: rgba(255,255,255,0.08);
+}
+
+.example-chip {
+  width: 100%;
+  border-radius: 14px;
+  padding: 10px 12px;
+  border-color: rgba(255, 109, 31, 0.18);
+  position: relative;
+}
+
+.example-chip::after {
+  content: "➜";
+  margin-left: auto;
+  opacity: 0.65;
+  font-size: 12px;
+}
+
+.example-chip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+.example-chip-title {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.example-chip-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.icon-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.icon-search-row input[type="text"] {
+  flex: 1;
+}
+
+.icon-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.icon-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.icon-toolbar select {
+  width: auto;
+  min-width: 110px;
+}
+
+.icon-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.icon-pager .pill {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
+}
+
+.icon-actions-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.icon-actions-row .btn {
+  flex: 1;
+}
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.icon-tile {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(255, 109, 31, 0.18);
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+[data-theme="dark"] .icon-tile {
+  background: transparent;
+}
+
+.icon-tile:hover {
+  border-color: rgba(255, 109, 31, 0.55);
+  transform: translateY(-1px);
+}
+
+.icon-tile:active {
+  transform: translateY(0);
+}
+
+.icon-tile img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  image-rendering: auto;
+  display: block;
+  /* keep clean/transparent look in the list */
+  filter: none;
 }
 input[type="color"] {
   border-radius: 999px;
