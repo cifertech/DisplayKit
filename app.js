@@ -2458,7 +2458,8 @@ function renderElements() {
     canvas.style.width = dispWidth * scale + "px";
     canvas.style.height = dispHeight * scale + "px";
     canvas.style.pointerEvents = "none";
-    canvas.style.zIndex = "1";
+    // Keep the OLED canvas above the background and below interaction overlays/icons
+    canvas.style.zIndex = "4";
     canvas.style.imageRendering = "pixelated";
     canvas.style.imageRendering = "-moz-crisp-edges";
     canvas.style.imageRendering = "crisp-edges";
@@ -2470,6 +2471,7 @@ function renderElements() {
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, dispWidth, dispHeight);
 
+        let didDrawAny = false;
         elements.forEach((el) => {
           try {
             const shouldFill = el.oledFill !== false;
@@ -2489,24 +2491,30 @@ function renderElements() {
             }
 
             if (el.type === "rect" || el.type === "card" || el.type === "header" || el.type === "button") {
+              didDrawAny = true;
               if (shouldFill) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); }
               ctx.strokeStyle = stroke;
               ctx.lineWidth = 1;
               ctx.strokeRect(x, y, w, h);
             } else if (el.type === "roundrect") {
+              didDrawAny = true;
               // Pixel preview: draw as a crisp rectangle (rounded corners would anti-alias).
               if (shouldFill) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); }
               ctx.strokeStyle = stroke;
               ctx.lineWidth = 1;
               ctx.strokeRect(x, y, w, h);
             } else if (el.type === "circle") {
+              didDrawAny = true;
               const r = Math.max(1, Math.floor(Math.min(w, h) / 2));
               drawOledCircle(ctx, x + r, y + r, r, shouldFill ? fill : stroke, shouldFill);
             } else if (el.type === "line") {
+              didDrawAny = true;
               drawOledLine(ctx, x, y, x + w, y + h, stroke);
             } else if (el.type === "divider") {
+              didDrawAny = true;
               drawOledLine(ctx, x, y, x + w, y, stroke);
             } else if (el.type === "progress") {
+              didDrawAny = true;
               const val = Math.max(0, Math.min(100, el.value != null ? el.value : 50));
               ctx.strokeStyle = stroke;
               ctx.lineWidth = 1;
@@ -2517,6 +2525,7 @@ function renderElements() {
                 ctx.fillRect(x + 1, y + 1, barW, Math.max(1, h - 2));
               }
             } else if (el.type === "slider" || el.type === "toggle") {
+              didDrawAny = true;
               ctx.strokeStyle = stroke;
               ctx.lineWidth = 1;
               ctx.strokeRect(x, y, w, h);
@@ -2533,6 +2542,7 @@ function renderElements() {
             }
 
             if (elementHasText(el.type)) {
+              didDrawAny = true;
               const t = el.text || (el.type === "button" ? "Button" : "");
               const pad = 1;
               drawOledThresholdedText(
@@ -2550,7 +2560,8 @@ function renderElements() {
             // Skip rendering this element on error; never break the whole OLED preview.
           }
         });
-        oledCanvasOk = true;
+        // Only treat canvas mode as "ok" if we actually drew some OLED primitives.
+        oledCanvasOk = didDrawAny;
       } catch (_) {
         oledCanvasOk = false;
       }
@@ -2634,6 +2645,11 @@ function renderElements() {
     if (el.type === "image" || el.type === "icon") {
       const src = el.type === "icon" ? el.iconSrc : el.previewUrl;
       const tintEnabled = el.type === "icon" && !!el.iconTintEnabled && !!el.iconTintColor;
+
+      if (isOLED && oledCanvasOk) {
+        // Ensure icons/images stay above the OLED canvas.
+        div.style.zIndex = el.id === selectedId ? "25" : "20";
+      }
 
       if (tintEnabled && src) {
         // Tint PNG using its alpha as a mask -> solid-colored icon silhouette.

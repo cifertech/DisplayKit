@@ -875,9 +875,9 @@ a.btn {
     linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
   background-size: var(--pixel-size, 8px) var(--pixel-size, 8px);
   pointer-events: none;
-  /* Keep grid above OLED canvas but below selection overlays */
-  z-index: 2;
-  opacity: 0.6;
+  /* Keep grid above OLED canvas but below interaction overlays */
+  z-index: 6;
+  opacity: 0.35;
 }
 
 #preview.manipulating::before {
