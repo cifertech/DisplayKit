@@ -2482,16 +2482,9 @@ function renderElements() {
             const w = Math.max(1, Math.round(el.w));
             const h = Math.max(1, Math.round(el.h));
 
+            // IMPORTANT: In OLED mode, icons/images are rendered via normal DOM elements (not the pixel canvas).
+            // This prevents CORS/tainted-canvas issues and matches the UX request ("icons don't need to be pixelated").
             if (el.type === "image" || el.type === "icon") {
-              const src = el.type === "icon" ? el.iconSrc : el.previewUrl;
-              if (src) {
-                if (el.type === "icon") {
-                  // Icons: tint by alpha mask (works even if the PNG itself is dark)
-                  drawOledIconAlphaMask(ctx, src, x, y, w, h, textColor);
-                } else {
-                  drawOledThresholdedImage(ctx, src, x, y, w, h, textColor);
-                }
-              }
               return;
             }
 
