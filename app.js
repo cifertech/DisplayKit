@@ -408,6 +408,7 @@ function importRgb565ImageToDisplayKit({ symbol, w, h, rgb565 }) {
   };
 
   elements.push(el);
+  syncActiveScreenElements();
   selectedId = id;
   updatePreviewSize();
   renderElements();
@@ -1946,6 +1947,7 @@ async function addIconElement(icon) {
   });
 
   elements.push(el);
+  syncActiveScreenElements();
   selectedId = el.id;
   updatePreviewSize();
   renderElements();
@@ -2042,6 +2044,13 @@ function setActiveScreen(id, push = true) {
   updatePropsInputs();
   updateCode();
   if (push) pushHistory();
+}
+
+function syncActiveScreenElements() {
+  const scr = screens.find((s) => s.id === activeScreenId);
+  if (!scr) return;
+  // Ensure `screens` always reflects the current `elements` array.
+  scr.elements = elements;
 }
 
 function initScreens() {
@@ -3115,6 +3124,7 @@ function bringToFront(elementId) {
   if (index > -1) {
     const element = elements.splice(index, 1)[0];
     elements.push(element);
+    syncActiveScreenElements();
     renderElements();
     updateCode();
     pushHistory();
@@ -3999,6 +4009,7 @@ imageInput.addEventListener("change", (e) => {
       };
 
       elements.push(el);
+      syncActiveScreenElements();
       selectedId = id;
       updatePreviewSize();
       renderElements();
@@ -4150,6 +4161,7 @@ function addElement(type) {
   };
 
   elements.push(el);
+  syncActiveScreenElements();
   selectedId = id;
 
   // Add visual feedback for element creation
@@ -4420,6 +4432,7 @@ duplicateBtn.addEventListener("click", () => {
   copy.y = Math.min(copy.y, dispHeight - copy.h);
 
   elements.push(copy);
+  syncActiveScreenElements();
   selectedId = id;
 
   // Add visual feedback for duplication
