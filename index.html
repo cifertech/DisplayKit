@@ -6,23 +6,15 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app-shell">
-  <div class="sidebar">
+  <div class="app-shell dk-grid">
+
+  <!-- Left rail: Assets + Layers -->
+  <div class="sidebar dk-left">
     <div class="sidebar-header">
       <div style="flex: 1;">
         <h2>DisplayKit</h2>
         <div class="brand-subtitle">by CiferTech</div>
       </div>
-    </div>
-
-    <div class="sidebar-card highlight">
-      <div class="sidebar-card-title">Project Links</div>
-      <a class="link-chip" href="https://github.com/cifertech/DisplayKit" target="_blank" rel="noreferrer">
-        <span class="icon">↗</span> GitHub Repo
-      </a>
-      <a class="link-chip" href="https://www.patreon.com/cifertech" target="_blank" rel="noreferrer">
-        <span class="icon">❤️</span> Support on Patreon
-      </a>
     </div>
 
     <div class="sidebar-card tools-card">
@@ -32,6 +24,9 @@
       </a>
       <a class="link-chip" href="tools/bitcanvas-studio/index.html" data-open-tool="bitcanvas" rel="noreferrer">
         <span class="icon">🎞️</span> BitCanvas Studio (Animation)
+      </a>
+      <a class="link-chip" href="tools/tft-gif-converter/index.html" data-open-tool="tftgif" rel="noreferrer">
+        <span class="icon">🖼️</span> TFT GIF Converter (Points)
       </a>
     </div>
 
@@ -89,6 +84,30 @@
       <div class="mini-hint" id="iconHint">Click an icon to add it as an element. Shift+Click also copies its path.</div>
     </div>
 
+    <!-- Assets Manager (project-local) -->
+    <div class="sidebar-card section-card" id="assetsCard">
+      <div class="sidebar-card-title">Assets</div>
+      <div class="mini-hint">Import PNGs to reuse across screens (images/icons).</div>
+      <div class="icon-search-row">
+        <input type="text" id="assetsSearch" placeholder="Search assets..." />
+        <button class="btn small secondary" type="button" id="assetsClearSearchBtn" title="Clear search">Clear</button>
+      </div>
+      <div class="assets-toolbar">
+        <div class="assets-toolbar-left">
+          <label class="toggle-row" title="Store the PNG inside exported JSON (bigger, portable).">
+            <input type="checkbox" id="assetsEmbedToggle" />
+            <span>Embed in JSON</span>
+          </label>
+        </div>
+        <div class="assets-toolbar-right">
+          <button class="btn small secondary" type="button" id="assetsImportBtn" title="Import PNGs">Import</button>
+          <button class="btn small secondary" type="button" id="assetsRemoveUnusedBtn" title="Remove unused assets">Clean</button>
+        </div>
+      </div>
+      <div class="assets-list" id="assetsList" aria-label="Assets"></div>
+      <input type="file" id="assetsImportInput" accept="image/png" multiple hidden />
+    </div>
+
     <div class="sidebar-card note section-card">
       <div class="sidebar-card-title">Workflow tips</div>
       <ul>
@@ -101,10 +120,44 @@
     <div class="sidebar-card section-card">
       <div class="sidebar-card-title">Basic Shapes</div>
       <div class="btn-group">
+        <button class="btn small chip-btn" data-add="triangle" title="Triangle">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 6.3l7.2 12.4H4.8L12 6.3Z" />
+            </svg>
+          </span>
+          <span class="chip-label">Triangle</span>
+        </button>
+        <button class="btn small chip-btn" data-add="polygon" title="Polygon">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5.2l7 5-2.8 8.8H7.8L5 10.2l7-5Z" />
+            </svg>
+          </span>
+          <span class="chip-label">Polygon</span>
+        </button>
+        <button class="btn small chip-btn" data-add="arc" title="Arc">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.2 16.8a7 7 0 0 1 15.6 0" />
+            </svg>
+          </span>
+          <span class="chip-label">Arc</span>
+        </button>
+        <button class="btn small chip-btn" data-add="gauge" title="Gauge">
+          <span class="icon-box shape">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.2 16.8a7 7 0 0 1 15.6 0" />
+              <path d="M12 13.2l4.6-2.3" />
+              <circle cx="12" cy="16.8" r="1.2" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <span class="chip-label">Gauge</span>
+        </button>
         <button class="btn small chip-btn" data-add="rect" title="Rect">
           <span class="icon-box shape">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="7" width="14" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+              <rect x="5" y="7" width="14" height="10" rx="2.5" ry="2.5" stroke="currentColor" stroke-width="2" fill="none" />
             </svg>
           </span>
           <span class="chip-label">Rect</span>
@@ -112,7 +165,7 @@
         <button class="btn small chip-btn" data-add="roundrect" title="Round Rect">
           <span class="icon-box shape">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="7" width="14" height="10" rx="5" ry="5" stroke="currentColor" stroke-width="2" fill="none" />
+              <rect x="5" y="7" width="14" height="10" rx="5.5" ry="5.5" stroke="currentColor" stroke-width="2" fill="none" />
             </svg>
           </span>
           <span class="chip-label">Round</span>
@@ -120,7 +173,7 @@
         <button class="btn small chip-btn" data-add="circle" title="Circle">
           <span class="icon-box shape">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="2" fill="none" />
+              <circle cx="12" cy="12" r="6.5" stroke="currentColor" stroke-width="2" fill="none" />
             </svg>
           </span>
           <span class="chip-label">Circle</span>
@@ -128,7 +181,8 @@
         <button class="btn small chip-btn" data-add="line" title="Line">
           <span class="icon-box shape">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <line x1="5" y1="18" x2="19" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <path d="M6 18L18 6" stroke="currentColor" stroke-width="2" fill="none" />
+              <path d="M7.2 16.8l1.2 1.2" stroke="currentColor" stroke-width="2" fill="none" opacity="0.75" />
             </svg>
           </span>
           <span class="chip-label">Line</span>
@@ -136,7 +190,10 @@
         <button class="btn small chip-btn" data-add="divider" title="Divider">
           <span class="icon-box shape">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <path d="M5.5 12h13" />
+              <circle cx="8" cy="12" r="1" fill="currentColor" stroke="none" opacity="0.9" />
+              <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" opacity="0.9" />
+              <circle cx="16" cy="12" r="1" fill="currentColor" stroke="none" opacity="0.9" />
             </svg>
           </span>
           <span class="chip-label">Divider</span>
@@ -150,9 +207,9 @@
         <button class="btn small chip-btn" data-add="text" title="Text">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
-              <path d="M9 11h9" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
-              <path d="M9 15h7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
+              <path d="M7 7h10" stroke="currentColor" stroke-width="2" fill="none" />
+              <path d="M12 7v12" stroke="currentColor" stroke-width="2" fill="none" />
+              <path d="M9 19h6" stroke="currentColor" stroke-width="2" fill="none" opacity="0.75" />
             </svg>
           </span>
           <span class="chip-label">Text</span>
@@ -160,8 +217,9 @@
         <button class="btn small chip-btn" data-add="label" title="Label">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="7" width="14" height="10" rx="3" ry="3" stroke="currentColor" stroke-width="2" fill="none" />
-              <line x1="8" y1="11" x2="16" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <rect x="5" y="7" width="14" height="10" rx="3.5" ry="3.5" />
+              <path d="M8 11h8.8" />
+              <path d="M8 14h5.6" opacity="0.75" />
             </svg>
           </span>
           <span class="chip-label">Label</span>
@@ -169,7 +227,8 @@
         <button class="btn small chip-btn" data-add="button" title="Button">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="6" y="9" width="12" height="6" rx="3" ry="3" stroke="currentColor" stroke-width="2" fill="none" />
+              <rect x="6" y="9" width="12" height="7" rx="3.5" ry="3.5" stroke="currentColor" stroke-width="2" fill="none" />
+              <path d="M9.2 12.5h5.6" stroke="currentColor" stroke-width="2" fill="none" opacity="0.8" />
             </svg>
           </span>
           <span class="chip-label">Button</span>
@@ -177,8 +236,8 @@
         <button class="btn small chip-btn" data-add="progress" title="Progress">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="10" width="14" height="4" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
-              <rect x="6" y="11" width="7" height="2" rx="1" ry="1" fill="currentColor" />
+              <rect x="5" y="10" width="14" height="4.5" rx="2.25" ry="2.25" />
+              <path d="M6.6 12.25h6.4" stroke-width="2.8" />
             </svg>
           </span>
           <span class="chip-label">Progress</span>
@@ -186,8 +245,9 @@
         <button class="btn small chip-btn" data-add="slider" title="Slider">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <line x1="6" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-              <circle cx="10" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="var(--bg-tertiary)" />
+              <path d="M6 12h12" stroke="currentColor" stroke-width="2" fill="none" />
+              <circle cx="10.5" cy="12" r="3.1" stroke="currentColor" stroke-width="2" fill="none" />
+              <path d="M10.5 10.7v2.6" stroke="currentColor" stroke-width="2" fill="none" opacity="0.8" />
             </svg>
           </span>
           <span class="chip-label">Slider</span>
@@ -195,8 +255,9 @@
         <button class="btn small chip-btn" data-add="toggle" title="Toggle">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="9" width="14" height="6" rx="3" ry="3" stroke="currentColor" stroke-width="2" fill="none" />
-              <circle cx="15" cy="12" r="2.5" stroke="currentColor" stroke-width="2" fill="var(--bg-tertiary)" />
+              <rect x="5" y="9" width="14" height="6.5" rx="3.25" ry="3.25" stroke="currentColor" stroke-width="2" fill="none" />
+              <circle cx="15.3" cy="12.25" r="2.65" stroke="currentColor" stroke-width="2" fill="none" />
+              <path d="M15.3 11.2v2.1" stroke="currentColor" stroke-width="2" fill="none" opacity="0.8" />
             </svg>
           </span>
           <span class="chip-label">Toggle</span>
@@ -204,8 +265,9 @@
         <button class="btn small chip-btn" data-add="card" title="Card">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="7" width="14" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
-              <line x1="7" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <rect x="5" y="7" width="14" height="10.5" rx="2.5" ry="2.5" />
+              <path d="M7.5 11h9.5" />
+              <path d="M7.5 14h7" opacity="0.75" />
             </svg>
           </span>
           <span class="chip-label">Card</span>
@@ -213,7 +275,8 @@
         <button class="btn small chip-btn" data-add="header" title="Header">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="5" y="7" width="14" height="4" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+              <rect x="5" y="7" width="14" height="4.5" rx="2.25" ry="2.25" />
+              <path d="M7.5 9.25h7" opacity="0.75" />
             </svg>
           </span>
           <span class="chip-label">Header</span>
@@ -221,59 +284,89 @@
         <button class="btn small chip-btn" id="addImageBtn" title="Image">
           <span class="icon-box ui">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="4" y="6" width="16" height="12" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
-              <circle cx="10" cy="11" r="1.5" stroke="currentColor" stroke-width="1.5" fill="none" />
-              <polyline points="7,16 11,12 16,16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              <rect x="4" y="6" width="16" height="12.5" rx="2.5" ry="2.5" />
+              <circle cx="10" cy="11" r="1.6" />
+              <path d="M7 16l4-4 5 4" />
             </svg>
           </span>
           <span class="chip-label">Image</span>
         </button>
       </div>
     </div>
+
+    <!-- Figma-like Layers panel (per screen) -->
+    <div class="sidebar-card section-card" id="layersCard">
+      <div class="sidebar-card-title">Layers</div>
+      <div class="mini-hint">Order = draw order (top is front). Drag to reorder.</div>
+      <div class="layers-toolbar">
+        <button class="btn small secondary" type="button" id="layersSelectAllBtn" title="Select all on current screen">Select all</button>
+        <button class="btn small secondary" type="button" id="layersClearSelectionBtn" title="Clear selection">Clear</button>
+      </div>
+      <div class="layers-list" id="layersList" aria-label="Layers"></div>
+    </div>
   </div>
 
-  <div class="main">
-    <div class="top-bar">
-      <div class="top-left">
-        <div class="top-left-primary">
-          <span id="displayInfo">TFT_eSPI · 240x320 px</span>
-          <span class="pill">Multi-screen · Drag to position · Click to edit</span>
-        </div>
-        <div class="status-chips">
-          <span class="pill soft">Drag to move</span>
-          <span class="pill soft">⌘ / Ctrl + Z to undo</span>
-          <span class="pill soft">Export JSON for versioning</span>
-        </div>
+  <!-- Top toolbar -->
+  <div class="top-bar dk-top" role="toolbar" aria-label="Editor toolbar">
+    <div class="top-left">
+      <div class="top-left-primary">
+        <span id="displayInfo">TFT_eSPI · 240x320 px</span>
+        <span class="pill">Multi-screen · Drag to position · Click to edit</span>
       </div>
-      <div class="top-right">
-        <a class="btn small github" href="https://github.com/cifertech/DisplayKit" target="_blank" rel="noreferrer">
-          GitHub
-        </a>
-        <a class="btn small patreon" href="https://www.patreon.com/cifertech" target="_blank" rel="noreferrer">
-          Patreon
-        </a>
-        <button class="btn small secondary" id="themeToggle" title="Toggle theme">
-          <span id="themeIcon">🌙</span>
-        </button>
-        <button class="btn small secondary" id="undoBtn">Undo</button>
-        <button class="btn small secondary" id="redoBtn">Redo</button>
-        <button class="btn small secondary" id="duplicateBtn">Duplicate</button>
-        <div class="slider-inline">
-          <span>Zoom</span>
-          <input type="range" id="zoomSlider" min="50" max="200" value="75" />
-        </div>
-        <button class="btn small secondary" id="exportJsonBtn">Export JSON</button>
-        <button class="btn small secondary" id="importJsonBtn">Import JSON</button>
+      <div class="status-chips">
+        <span class="pill soft">Space+Drag to pan</span>
+        <span class="pill soft">Ctrl/Cmd+Wheel to zoom</span>
+        <span class="pill soft">Ctrl/Cmd+drag: no snap</span>
       </div>
     </div>
-    <div class="workspace">
-      <div class="preview-wrapper">
-        <div class="preview-frame">
+    <div class="top-right">
+      <div class="tool-toggle">
+        <button class="btn small secondary" id="toolSelectBtn" type="button" aria-pressed="true" title="Select (V)">Select</button>
+        <button class="btn small secondary" id="toolHandBtn" type="button" aria-pressed="false" title="Hand / Pan (Space)">Hand</button>
+      </div>
+      <a class="btn small github" href="https://github.com/cifertech/DisplayKit" target="_blank" rel="noreferrer">GitHub</a>
+      <a class="btn small patreon" href="https://www.patreon.com/cifertech" target="_blank" rel="noreferrer">Patreon</a>
+      <button class="btn small secondary" id="themeToggle" title="Toggle theme"><span id="themeIcon">🌙</span></button>
+      <button class="btn small secondary" id="undoBtn">Undo</button>
+      <button class="btn small secondary" id="redoBtn">Redo</button>
+      <button class="btn small secondary" id="duplicateBtn">Duplicate</button>
+      <div class="slider-inline">
+        <span>Zoom</span>
+        <input type="range" id="zoomSlider" min="50" max="200" value="75" />
+      </div>
+      <div class="zoom-inline">
+        <input type="number" id="zoomInput" min="50" max="300" step="1" value="75" title="Zoom %" />
+        <span class="pill outline small">%</span>
+        <button class="btn small secondary" id="zoomResetBtn" type="button" title="Reset zoom">Reset</button>
+        <button class="btn small secondary" id="zoomFitBtn" type="button" title="Fit to screen">Fit</button>
+        <button class="btn small secondary" id="zoomSelectionBtn" type="button" title="Zoom to selection">Selection</button>
+      </div>
+      <button class="btn small secondary" id="exportJsonBtn">Export JSON</button>
+      <button class="btn small secondary" id="importJsonBtn">Import JSON</button>
+    </div>
+  </div>
+
+  <!-- Center: canvas -->
+  <div class="workspace dk-center">
+    <div class="preview-wrapper">
+      <div class="preview-frame">
+        <div class="preview-viewport" id="previewViewport">
           <div id="preview"></div>
         </div>
       </div>
-      <div class="properties">
-        <div class="props-section">
+    </div>
+  </div>
+
+  <!-- Right: inspector -->
+  <div class="properties dk-right">
+    <div class="inspector-tabs" role="tablist" aria-label="Inspector tabs">
+      <button class="inspector-tab" type="button" id="inspectorTabBtn_project" role="tab" aria-selected="true" data-inspector-tab="project">Project</button>
+      <button class="inspector-tab" type="button" id="inspectorTabBtn_selection" role="tab" aria-selected="false" data-inspector-tab="selection">Selection</button>
+      <button class="inspector-tab" type="button" id="inspectorTabBtn_code" role="tab" aria-selected="false" data-inspector-tab="code">Code</button>
+    </div>
+
+    <div class="inspector-body">
+      <div class="props-section inspector-tab-panel" id="inspectorTab_project" role="tabpanel" aria-labelledby="inspectorTabBtn_project">
           <div class="settings-block" id="settingsProjectBlock">
             <div class="section-title" id="settingsProjectTitle">Project</div>
             <div class="mini-hint">Project settings live here (screens, display, scene, grid).</div>
@@ -501,7 +594,9 @@
             </div>
           </div>
         </div>
+      </div>
 
+      <div class="props-section inspector-tab-panel" id="inspectorTab_selection" role="tabpanel" aria-labelledby="inspectorTabBtn_selection" hidden>
         <div class="section-title" id="selectedElementTitle">Selected Element</div>
         <div id="noSelection">No element selected</div>
         <div id="propsPanel" style="display: none">
@@ -513,22 +608,28 @@
           <div class="prop-group">
             <div class="prop-row">
               <div>
-                <label for="propX">X</label>
+                <label for="propX" class="scrub-label">X</label>
                 <input type="number" id="propX" />
               </div>
               <div>
-                <label for="propY">Y</label>
+                <label for="propY" class="scrub-label">Y</label>
                 <input type="number" id="propY" />
               </div>
             </div>
             <div class="prop-row">
               <div>
-                <label for="propW">W</label>
+                <label for="propW" class="scrub-label">W</label>
                 <input type="number" id="propW" />
               </div>
               <div>
-                <label for="propH">H</label>
+                <label for="propH" class="scrub-label">H</label>
                 <input type="number" id="propH" />
+              </div>
+            </div>
+            <div class="prop-row">
+              <div>
+                <label for="propRotate" class="scrub-label">Rotate °</label>
+                <input type="number" id="propRotate" step="1" title="Rotation (Shift on handle: 15° steps)" />
               </div>
             </div>
           </div>
@@ -540,6 +641,31 @@
               <div>
                 <label for="propTextSize">Text size (TFT)</label>
                 <input type="number" id="propTextSize" min="1" max="10" />
+              </div>
+            </div>
+            <div class="prop-row">
+              <div>
+                <label for="propLineHeight">Line height</label>
+                <input type="number" id="propLineHeight" min="6" max="64" />
+              </div>
+              <div class="prop-inline">
+                <label class="toggle-label" title="Auto-size text box to fit content">
+                  <input type="checkbox" id="propTextAutoSize" class="toggle-input" />
+                  Auto-size
+                </label>
+              </div>
+            </div>
+            <div class="prop-group">
+              <div class="mini-hint">Alignment</div>
+              <div class="btn-group">
+                <button class="btn small secondary" type="button" id="textAlignLeftBtn" title="Align left">Left</button>
+                <button class="btn small secondary" type="button" id="textAlignCenterBtn" title="Align center">Center</button>
+                <button class="btn small secondary" type="button" id="textAlignRightBtn" title="Align right">Right</button>
+              </div>
+              <div class="btn-group" style="margin-top:6px;">
+                <button class="btn small secondary" type="button" id="vAlignTopBtn" title="Top">Top</button>
+                <button class="btn small secondary" type="button" id="vAlignMiddleBtn" title="Middle">Middle</button>
+                <button class="btn small secondary" type="button" id="vAlignBottomBtn" title="Bottom">Bottom</button>
               </div>
             </div>
           </div>
@@ -631,6 +757,39 @@
             </div>
           </div>
 
+          <div class="prop-group">
+            <label>Distribute</label>
+            <div class="btn-group">
+              <button class="btn small secondary" id="distributeHBtn" title="Distribute horizontally (multi-select)">Horizontal</button>
+              <button class="btn small secondary" id="distributeVBtn" title="Distribute vertically (multi-select)">Vertical</button>
+            </div>
+          </div>
+
+          <div class="prop-group" id="constraintsGroup">
+            <label>Constraints (on resize)</label>
+            <div class="prop-row">
+              <label class="toggle-label" title="Keep distance to left edge">
+                <input type="checkbox" id="constraintLeft" class="toggle-input" />
+                Left
+              </label>
+              <label class="toggle-label" title="Keep distance to right edge">
+                <input type="checkbox" id="constraintRight" class="toggle-input" />
+                Right
+              </label>
+            </div>
+            <div class="prop-row">
+              <label class="toggle-label" title="Keep distance to top edge">
+                <input type="checkbox" id="constraintTop" class="toggle-input" />
+                Top
+              </label>
+              <label class="toggle-label" title="Keep distance to bottom edge">
+                <input type="checkbox" id="constraintBottom" class="toggle-input" />
+                Bottom
+              </label>
+            </div>
+            <div class="mini-hint">Tip: set both Left+Right to stretch horizontally; Top+Bottom to stretch vertically.</div>
+          </div>
+
           <div class="prop-group" style="display: flex; justify-content: flex-end;">
             <button class="btn danger small" id="deleteElement" title="Delete element">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -644,22 +803,24 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="code-panel">
-      <div style="display: flex; justify-content: space-between; align-items: center">
-        <div class="section-title">Generated Code (TFT_eSPI / U8g2)</div>
-        <div>
-          <button class="btn small secondary" id="copyCode">
-            <svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;margin-right:4px">
-              <rect x="9" y="9" width="11" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
-              <rect x="4" y="4" width="11" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
-            </svg>
-            <span>Copy</span>
-          </button>
+      <div class="props-section inspector-tab-panel" id="inspectorTab_code" role="tabpanel" aria-labelledby="inspectorTabBtn_code" hidden>
+        <div class="code-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <div class="section-title">Generated Code (TFT_eSPI / U8g2)</div>
+            <div>
+              <button class="btn small secondary" id="copyCode">
+                <svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;margin-right:4px">
+                  <rect x="9" y="9" width="11" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+                  <rect x="4" y="4" width="11" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
+                </svg>
+                <span>Copy</span>
+              </button>
+            </div>
+          </div>
+          <textarea id="codeOutput" spellcheck="false"></textarea>
         </div>
       </div>
-      <textarea id="codeOutput" spellcheck="false"></textarea>
     </div>
   </div>
 
@@ -668,6 +829,21 @@
   
   <input type="file" id="imageInput" accept="image/*" style="display: none" />
   <input type="file" id="importJsonInput" accept="application/json" style="display:none" />
+
+  <!-- Context menu (Figma-like) -->
+  <div class="context-menu" id="contextMenu" aria-hidden="true">
+    <button type="button" class="context-item" data-action="duplicate">Duplicate</button>
+    <button type="button" class="context-item" data-action="delete">Delete</button>
+    <div class="context-sep"></div>
+    <button type="button" class="context-item" data-action="group">Group</button>
+    <button type="button" class="context-item" data-action="ungroup">Ungroup</button>
+    <div class="context-sep"></div>
+    <button type="button" class="context-item" data-action="front">Bring to front</button>
+    <button type="button" class="context-item" data-action="back">Send to back</button>
+    <div class="context-sep"></div>
+    <button type="button" class="context-item" data-action="lock">Lock/Unlock</button>
+    <button type="button" class="context-item" data-action="hide">Hide/Show</button>
+  </div>
 
   <!-- In-app tools overlay (PixelForge / BitCanvas Studio) -->
   <div class="tool-overlay" id="toolOverlay" aria-hidden="true">
@@ -681,6 +857,9 @@
             </button>
             <button class="tool-switch-btn" type="button" data-switch-tool="bitcanvas" role="tab" aria-selected="false">
               🎞️ BitCanvas
+            </button>
+            <button class="tool-switch-btn" type="button" data-switch-tool="tftgif" role="tab" aria-selected="false">
+              🖼️ TFT GIF
             </button>
           </div>
         </div>
@@ -702,6 +881,13 @@
           id="toolFrame_bitcanvas"
           class="tool-overlay-frame"
           title="BitCanvas Studio"
+          src="about:blank"
+          allow="clipboard-read; clipboard-write"
+        ></iframe>
+        <iframe
+          id="toolFrame_tftgif"
+          class="tool-overlay-frame"
+          title="TFT GIF Converter"
           src="about:blank"
           allow="clipboard-read; clipboard-write"
         ></iframe>

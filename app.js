@@ -3,12 +3,19 @@ let elements = [];
 let screens = [];
 let activeScreenId = null;
 let selectedId = null;
+let selectedIds = new Set();
+
+// Project assets registry (PNG icons/images/components). Elements reference assets by `assetId`.
+// Shape: { id, name, kind: "image"|"icon", dataUrl?, sourceName?, width?, height?, rgb565?, monoBitmap? }
+let assets = [];
 
 let dispWidth = 240;
 let dispHeight = 320;
 let bgColor = "#000000";
 let useSprite = false;
 let zoomFactor = 0.75;
+let lastDispWidth = dispWidth;
+let lastDispHeight = dispHeight;
 
 let snapToGrid = false;
 let gridSize = 4;
@@ -98,8 +105,11 @@ const propX = document.getElementById("propX");
 const propY = document.getElementById("propY");
 const propW = document.getElementById("propW");
 const propH = document.getElementById("propH");
+const propRotate = document.getElementById("propRotate");
 const propText = document.getElementById("propText");
 const propTextSize = document.getElementById("propTextSize");
+const propLineHeight = document.getElementById("propLineHeight");
+const propTextAutoSize = document.getElementById("propTextAutoSize");
 const propValue = document.getElementById("propValue");
 const propFillColor = document.getElementById("propFillColor");
 const propStrokeColor = document.getElementById("propStrokeColor");
@@ -117,6 +127,19 @@ const iconTintGroup = document.getElementById("iconTintGroup");
 const propIconTintEnabled = document.getElementById("propIconTintEnabled");
 const propIconTintColor = document.getElementById("propIconTintColor");
 
+// Text tools (alignment)
+const textAlignLeftBtn = document.getElementById("textAlignLeftBtn");
+const textAlignCenterBtn = document.getElementById("textAlignCenterBtn");
+const textAlignRightBtn = document.getElementById("textAlignRightBtn");
+const vAlignTopBtn = document.getElementById("vAlignTopBtn");
+const vAlignMiddleBtn = document.getElementById("vAlignMiddleBtn");
+const vAlignBottomBtn = document.getElementById("vAlignBottomBtn");
+
+const constraintLeft = document.getElementById("constraintLeft");
+const constraintRight = document.getElementById("constraintRight");
+const constraintTop = document.getElementById("constraintTop");
+const constraintBottom = document.getElementById("constraintBottom");
+
 
 const alignLeftBtn = document.getElementById("alignLeftBtn");
 const alignHCenterBtn = document.getElementById("alignHCenterBtn");
@@ -124,6 +147,8 @@ const alignRightBtn = document.getElementById("alignRightBtn");
 const alignTopBtn = document.getElementById("alignTopBtn");
 const alignVCenterBtn = document.getElementById("alignVCenterBtn");
 const alignBottomBtn = document.getElementById("alignBottomBtn");
+const distributeHBtn = document.getElementById("distributeHBtn");
+const distributeVBtn = document.getElementById("distributeVBtn");
 
 
 const codeOutput = document.getElementById("codeOutput");
@@ -136,11 +161,518 @@ const undoBtn = document.getElementById("undoBtn");
 const redoBtn = document.getElementById("redoBtn");
 const duplicateBtn = document.getElementById("duplicateBtn");
 const zoomSlider = document.getElementById("zoomSlider");
+const zoomInput = document.getElementById("zoomInput");
+const zoomResetBtn = document.getElementById("zoomResetBtn");
+const zoomFitBtn = document.getElementById("zoomFitBtn");
+const zoomSelectionBtn = document.getElementById("zoomSelectionBtn");
 const exportJsonBtn = document.getElementById("exportJsonBtn");
 const importJsonBtn = document.getElementById("importJsonBtn");
 const importJsonInput = document.getElementById("importJsonInput");
 const bgColorChips = document.querySelectorAll("[data-bg-color]");
 const bgColorCustomBtn = document.getElementById("bgColorCustom");
+
+// Figma-like layout additions
+const previewViewport = document.getElementById("previewViewport");
+const toolSelectBtn = document.getElementById("toolSelectBtn");
+const toolHandBtn = document.getElementById("toolHandBtn");
+const inspectorTabBtns = document.querySelectorAll("[data-inspector-tab]");
+const inspectorProjectPanel = document.getElementById("inspectorTab_project");
+const inspectorSelectionPanel = document.getElementById("inspectorTab_selection");
+const inspectorCodePanel = document.getElementById("inspectorTab_code");
+
+const contextMenu = document.getElementById("contextMenu");
+
+let activeTool = "select"; // "select" | "hand"
+let viewportPanX = 0;
+let viewportPanY = 0;
+let isSpaceDown = false;
+let isPanning = false;
+let panStart = null; // { x, y, panX, panY }
+let isMarqueeSelecting = false;
+let marqueeStart = null; // { x, y }
+let marqueeEl = null;
+let snapGuideV = null;
+let snapGuideH = null;
+let rulerCorner = null;
+let rulerX = null;
+let rulerY = null;
+let rulerCanvasX = null;
+let rulerCanvasY = null;
+let guides = []; // { id, orient: "v"|"h", pos }
+let previewWrapper = null;
+
+function setActiveTool(tool) {
+  activeTool = tool === "hand" ? "hand" : "select";
+  if (toolSelectBtn) toolSelectBtn.setAttribute("aria-pressed", activeTool === "select" ? "true" : "false");
+  if (toolHandBtn) toolHandBtn.setAttribute("aria-pressed", activeTool === "hand" ? "true" : "false");
+  if (preview) preview.dataset.activeTool = activeTool;
+  try { updateCanvasCursorClass(); } catch (_) {}
+}
+
+function setInspectorTab(tab) {
+  const t = tab === "selection" || tab === "code" ? tab : "project";
+  inspectorTabBtns.forEach((btn) => {
+    const isActive = btn.getAttribute("data-inspector-tab") === t;
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  if (inspectorProjectPanel) inspectorProjectPanel.hidden = t !== "project";
+  if (inspectorSelectionPanel) inspectorSelectionPanel.hidden = t !== "selection";
+  if (inspectorCodePanel) inspectorCodePanel.hidden = t !== "code";
+}
+
+function clamp(n, lo, hi) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function applyViewportTransform() {
+  if (!previewViewport) return;
+  // OLED zoom is applied via integer `scale` in updatePreviewSize (pixel-perfect).
+  const z = driverMode === "u8g2" ? 1 : clamp(zoomFactor || 1, 0.5, 3);
+  previewViewport.style.transform = `translate(${viewportPanX}px, ${viewportPanY}px) scale(${z})`;
+  try { ensureRulers(); } catch (_) {}
+}
+
+function updateCanvasCursorClass() {
+  if (!previewWrapper) previewWrapper = document.querySelector(".preview-wrapper");
+  if (!previewWrapper) return;
+  const wantsHand = activeTool === "hand" || isSpaceDown;
+  previewWrapper.classList.toggle("cursor-hand", wantsHand);
+  previewWrapper.classList.toggle("grabbing", !!isPanning);
+  if (preview) preview.dataset.activeTool = activeTool;
+}
+
+function getPathOverlay() {
+  if (!preview) return null;
+  let ov = preview.querySelector(".path-overlay");
+  if (!ov) {
+    ov = document.createElement("svg");
+    ov.className = "path-overlay";
+    ov.setAttribute("width", "100%");
+    ov.setAttribute("height", "100%");
+    ov.setAttribute("viewBox", `0 0 ${dispWidth} ${dispHeight}`);
+    ov.setAttribute("preserveAspectRatio", "none");
+    preview.appendChild(ov);
+  } else {
+    ov.setAttribute("viewBox", `0 0 ${dispWidth} ${dispHeight}`);
+  }
+  return ov;
+}
+
+// (Pen tool removed)
+
+function ensureMarqueeEl() {
+  if (marqueeEl) return marqueeEl;
+  const wrapper = document.querySelector(".preview-wrapper");
+  if (!wrapper) return null;
+  wrapper.style.position = wrapper.style.position || "relative";
+  marqueeEl = document.createElement("div");
+  marqueeEl.className = "marquee-box";
+  marqueeEl.style.display = "none";
+  wrapper.appendChild(marqueeEl);
+  return marqueeEl;
+}
+
+function ensureSnapGuides() {
+  if (snapGuideV && snapGuideH) return { v: snapGuideV, h: snapGuideH };
+  const root = preview;
+  if (!root) return { v: null, h: null };
+  // Guides should move/scale with the preview itself.
+  snapGuideV = document.createElement("div");
+  snapGuideV.className = "snap-guide v";
+  snapGuideH = document.createElement("div");
+  snapGuideH.className = "snap-guide h";
+  root.appendChild(snapGuideV);
+  root.appendChild(snapGuideH);
+  return { v: snapGuideV, h: snapGuideH };
+}
+
+function hideSnapGuides() {
+  if (snapGuideV) snapGuideV.classList.remove("show");
+  if (snapGuideH) snapGuideH.classList.remove("show");
+}
+
+function ensureRulers() {
+  const wrapper = document.querySelector(".preview-wrapper");
+  const frame = document.querySelector(".preview-frame");
+  if (!wrapper || !frame) return;
+  // Rulers sit in wrapper coordinates (not scaled with previewViewport transform).
+  wrapper.style.position = wrapper.style.position || "relative";
+
+  if (!rulerCorner) {
+    rulerCorner = document.createElement("div");
+    rulerCorner.className = "ruler-corner";
+    wrapper.appendChild(rulerCorner);
+  }
+  if (!rulerX) {
+    rulerX = document.createElement("div");
+    rulerX.className = "ruler-x";
+    rulerCanvasX = document.createElement("canvas");
+    rulerCanvasX.className = "ruler-canvas";
+    rulerX.appendChild(rulerCanvasX);
+    wrapper.appendChild(rulerX);
+  }
+  if (!rulerY) {
+    rulerY = document.createElement("div");
+    rulerY.className = "ruler-y";
+    rulerCanvasY = document.createElement("canvas");
+    rulerCanvasY.className = "ruler-canvas";
+    rulerY.appendChild(rulerCanvasY);
+    wrapper.appendChild(rulerY);
+  }
+
+  // Size rulers to match the preview size on screen.
+  const previewRect = preview.getBoundingClientRect();
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const w = Math.max(0, Math.round(previewRect.width));
+  const h = Math.max(0, Math.round(previewRect.height));
+  const left = Math.round(previewRect.left - wrapperRect.left);
+  const top = Math.round(previewRect.top - wrapperRect.top);
+
+  rulerCorner.style.left = (left - 28) + "px";
+  rulerCorner.style.top = (top - 28) + "px";
+  rulerX.style.left = left + "px";
+  rulerX.style.top = (top - 28) + "px";
+  rulerX.style.width = w + "px";
+  rulerY.style.left = (left - 28) + "px";
+  rulerY.style.top = top + "px";
+  rulerY.style.height = h + "px";
+
+  // Canvas pixel ratio
+  const dpr = window.devicePixelRatio || 1;
+  rulerCanvasX.width = Math.max(1, Math.floor(w * dpr));
+  rulerCanvasX.height = Math.max(1, Math.floor(28 * dpr));
+  rulerCanvasX.style.width = w + "px";
+  rulerCanvasX.style.height = "28px";
+
+  rulerCanvasY.width = Math.max(1, Math.floor(28 * dpr));
+  rulerCanvasY.height = Math.max(1, Math.floor(h * dpr));
+  rulerCanvasY.style.width = "28px";
+  rulerCanvasY.style.height = h + "px";
+
+  // Draw ticks based on logical px.
+  const scale = parseFloat(preview.dataset.scale || "1");
+  const z = clamp(zoomFactor || 1, 0.5, 3);
+  const pxPerUnit = scale * z;
+
+  const ctxX = rulerCanvasX.getContext("2d");
+  const ctxY = rulerCanvasY.getContext("2d");
+  if (!ctxX || !ctxY) return;
+  ctxX.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctxY.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctxX.clearRect(0, 0, w, 28);
+  ctxY.clearRect(0, 0, 28, h);
+  ctxX.fillStyle = "rgba(255,255,255,0.75)";
+  ctxY.fillStyle = "rgba(255,255,255,0.75)";
+  ctxX.strokeStyle = "rgba(255,255,255,0.22)";
+  ctxY.strokeStyle = "rgba(255,255,255,0.22)";
+  ctxX.font = "10px ui-sans-serif";
+  ctxY.font = "10px ui-sans-serif";
+
+  const maxUnitsX = dispWidth;
+  for (let u = 0; u <= maxUnitsX; u += 10) {
+    const x = u * pxPerUnit;
+    const isMajor = u % 50 === 0;
+    ctxX.beginPath();
+    ctxX.moveTo(x + 0.5, 28);
+    ctxX.lineTo(x + 0.5, isMajor ? 10 : 18);
+    ctxX.stroke();
+    if (isMajor) ctxX.fillText(String(u), x + 2, 10);
+  }
+
+  const maxUnitsY = dispHeight;
+  for (let u = 0; u <= maxUnitsY; u += 10) {
+    const y = u * pxPerUnit;
+    const isMajor = u % 50 === 0;
+    ctxY.beginPath();
+    ctxY.moveTo(28, y + 0.5);
+    ctxY.lineTo(isMajor ? 10 : 18, y + 0.5);
+    ctxY.stroke();
+    if (isMajor) ctxY.fillText(String(u), 2, y - 2);
+  }
+}
+
+function renderGuides() {
+  // remove old
+  document.querySelectorAll(".guide-line").forEach((n) => n.remove());
+  const scale = parseFloat(preview.dataset.scale || "1");
+  guides.forEach((g) => {
+    const div = document.createElement("div");
+    div.className = "guide-line " + g.orient;
+    div.dataset.id = g.id;
+    if (g.orient === "v") div.style.left = (g.pos * scale) + "px";
+    else div.style.top = (g.pos * scale) + "px";
+    preview.appendChild(div);
+
+    let dragging = false;
+    let start = 0;
+    div.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      dragging = true;
+      start = g.orient === "v" ? e.clientX : e.clientY;
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const cur = g.orient === "v" ? e.clientX : e.clientY;
+      const deltaPx = cur - start;
+      const deltaUnits = deltaPx / scale;
+      g.pos = Math.max(0, Math.round(g.pos + deltaUnits));
+      start = cur;
+      renderGuides();
+    });
+    document.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      pushHistory();
+    });
+    div.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      guides = guides.filter((x) => x.id !== g.id);
+      renderGuides();
+      pushHistory();
+    });
+  });
+}
+
+function snapMoveToElements(elementId, x, y, opts) {
+  const suppressSnap = !!(opts && opts.suppressSnap);
+  if (suppressSnap) return { x, y, gx: null, gy: null };
+
+  const threshold = 4;
+  const el = elements.find((e) => e.id === elementId);
+  if (!el) return { x, y, gx: null, gy: null };
+
+  const ptsX = [x, x + el.w / 2, x + el.w];
+  const ptsY = [y, y + el.h / 2, y + el.h];
+
+  let bestDx = null;
+  let bestGx = null;
+  let bestDy = null;
+  let bestGy = null;
+
+  for (const other of elements) {
+    if (other.hidden || other.id === elementId) continue;
+    const oxs = [other.x, other.x + other.w / 2, other.x + other.w];
+    const oys = [other.y, other.y + other.h / 2, other.y + other.h];
+
+    for (let i = 0; i < ptsX.length; i++) {
+      for (let j = 0; j < oxs.length; j++) {
+        const dx = oxs[j] - ptsX[i];
+        const adx = Math.abs(dx);
+        if (adx <= threshold && (bestDx == null || adx < Math.abs(bestDx))) {
+          bestDx = dx;
+          bestGx = oxs[j];
+        }
+      }
+    }
+    for (let i = 0; i < ptsY.length; i++) {
+      for (let j = 0; j < oys.length; j++) {
+        const dy = oys[j] - ptsY[i];
+        const ady = Math.abs(dy);
+        if (ady <= threshold && (bestDy == null || ady < Math.abs(bestDy))) {
+          bestDy = dy;
+          bestGy = oys[j];
+        }
+      }
+    }
+  }
+
+  for (const g of guides) {
+    if (!g) continue;
+    if (g.orient === "v") {
+      const pos = g.pos;
+      for (let i = 0; i < ptsX.length; i++) {
+        const dx = pos - ptsX[i];
+        const adx = Math.abs(dx);
+        if (adx <= threshold && (bestDx == null || adx < Math.abs(bestDx))) {
+          bestDx = dx;
+          bestGx = pos;
+        }
+      }
+    } else {
+      const pos = g.pos;
+      for (let i = 0; i < ptsY.length; i++) {
+        const dy = pos - ptsY[i];
+        const ady = Math.abs(dy);
+        if (ady <= threshold && (bestDy == null || ady < Math.abs(bestDy))) {
+          bestDy = dy;
+          bestGy = pos;
+        }
+      }
+    }
+  }
+
+  return {
+    x: bestDx != null ? x + bestDx : x,
+    y: bestDy != null ? y + bestDy : y,
+    gx: bestGx,
+    gy: bestGy,
+  };
+}
+
+function clientToArtboardPx(clientX, clientY) {
+  if (!preview) return { x: 0, y: 0 };
+  const pr = preview.getBoundingClientRect();
+  if (pr.width <= 0 || pr.height <= 0) return { x: 0, y: 0 };
+  const lx = (clientX - pr.left) * dispWidth / pr.width;
+  const ly = (clientY - pr.top) * dispHeight / pr.height;
+  return { x: lx, y: ly };
+}
+
+function clearDistanceHints() {
+  if (!preview) return;
+  preview.querySelectorAll(".distance-hint").forEach((n) => n.remove());
+}
+
+function updateDistanceHintsForDrag(excludeId, x, y, w, h) {
+  clearDistanceHints();
+  const scale = parseFloat(preview.dataset.scale || "1");
+  const cap = 200;
+  let bestH = null;
+  let bestV = null;
+
+  function considerHorizontal(other) {
+    const ox = other.x;
+    const oy = other.y;
+    const ow = other.w;
+    const oh = other.h;
+    const yOverlap = !(y + h <= oy || y >= oy + oh);
+    if (!yOverlap) return;
+    if (ox >= x + w) {
+      const g = ox - (x + w);
+      if (g >= 0 && g <= cap && (!bestH || g < bestH.g))
+        bestH = { g, mx: (x + w + ox) / 2, my: (Math.max(y, oy) + Math.min(y + h, oy + oh)) / 2 };
+    }
+    if (ox + ow <= x) {
+      const g = x - (ox + ow);
+      if (g >= 0 && g <= cap && (!bestH || g < bestH.g))
+        bestH = { g, mx: (ox + ow + x) / 2, my: (Math.max(y, oy) + Math.min(y + h, oy + oh)) / 2 };
+    }
+  }
+
+  function considerVertical(other) {
+    const ox = other.x;
+    const oy = other.y;
+    const ow = other.w;
+    const oh = other.h;
+    const xOverlap = !(x + w <= ox || x >= ox + ow);
+    if (!xOverlap) return;
+    if (oy >= y + h) {
+      const g = oy - (y + h);
+      if (g >= 0 && g <= cap && (!bestV || g < bestV.g))
+        bestV = { g, mx: (Math.max(x, ox) + Math.min(x + w, ox + ow)) / 2, my: (y + h + oy) / 2 };
+    }
+    if (oy + oh <= y) {
+      const g = y - (oy + oh);
+      if (g >= 0 && g <= cap && (!bestV || g < bestV.g))
+        bestV = { g, mx: (Math.max(x, ox) + Math.min(x + w, ox + ow)) / 2, my: (oy + oh + y) / 2 };
+    }
+  }
+
+  for (const o of elements) {
+    if (o.id === excludeId || o.hidden) continue;
+    considerHorizontal(o);
+    considerVertical(o);
+  }
+
+  function place(val, ax, ay) {
+    const s = document.createElement("div");
+    s.className = "distance-hint";
+    s.textContent = String(Math.round(val));
+    s.style.left = ax * scale + "px";
+    s.style.top = ay * scale + "px";
+    preview.appendChild(s);
+  }
+
+  if (bestH) place(bestH.g, bestH.mx, bestH.my);
+  if (bestV) place(bestV.g, bestV.mx, bestV.my);
+}
+
+function elementShowsRotationHandle(el, isOLED, oledCanvasOk) {
+  if (el.type === "line") return false;
+  if (isOLED && oledCanvasOk) return el.type === "image" || el.type === "icon";
+  return true;
+}
+
+function applyPreviewElementTransform(div, el, isSelected) {
+  const rot = Number(el.rotation) || 0;
+  if (el.type === "line") {
+    const base = Math.atan2(el.h, el.w) * (180 / Math.PI);
+    div.style.transformOrigin = "0 50%";
+    const parts = [`rotate(${base + rot}deg)`];
+    if (isSelected) parts.push("scale(1.01)");
+    div.style.transform = parts.join(" ");
+    return;
+  }
+  div.style.transformOrigin = "50% 50%";
+  const parts = [];
+  if (rot) parts.push(`rotate(${rot}deg)`);
+  if (isSelected) parts.push("scale(1.01)");
+  div.style.transform = parts.length ? parts.join(" ") : "";
+}
+
+function zoomToSelection() {
+  const ids = selectedIds && selectedIds.size ? Array.from(selectedIds) : (selectedId ? [selectedId] : []);
+  if (!ids.length) return;
+  const els = ids.map((id) => elements.find((e) => e.id === id)).filter(Boolean);
+  if (!els.length) return;
+
+  const pad = 24;
+  let minX = Math.min(...els.map((e) => e.x)) - pad;
+  let maxX = Math.max(...els.map((e) => e.x + e.w)) + pad;
+  let minY = Math.min(...els.map((e) => e.y)) - pad;
+  let maxY = Math.max(...els.map((e) => e.y + e.h)) + pad;
+  minX = clamp(minX, 0, dispWidth);
+  minY = clamp(minY, 0, dispHeight);
+  maxX = clamp(maxX, 0, dispWidth);
+  maxY = clamp(maxY, 0, dispHeight);
+  const bw = Math.max(32, maxX - minX);
+  const bh = Math.max(32, maxY - minY);
+
+  const wrapper = document.querySelector(".preview-wrapper");
+  if (!wrapper || !preview) return;
+  const wr = wrapper.getBoundingClientRect();
+  const scale = parseFloat(preview.dataset.scale || "1");
+  let targetZ = Math.min(wr.width / (bw * scale), wr.height / (bh * scale)) * 0.9;
+  targetZ = clamp(targetZ, 0.5, 3);
+
+  viewportPanX = 0;
+  viewportPanY = 0;
+  if (driverMode === "u8g2") {
+    setZoom(targetZ);
+    updatePreviewSize();
+    applyViewportTransform();
+  } else {
+    setZoom(targetZ);
+    applyViewportTransform();
+    updatePreviewSize();
+  }
+  renderElements();
+  renderLayers();
+
+  requestAnimationFrame(() => {
+    const nodes = ids
+      .map((id) => document.querySelector(`.ui-element[data-id="${id}"]`))
+      .filter(Boolean);
+    if (!nodes.length) return;
+    let u = null;
+    nodes.forEach((n) => {
+      const r = n.getBoundingClientRect();
+      if (!u) u = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+      else {
+        u.left = Math.min(u.left, r.left);
+        u.top = Math.min(u.top, r.top);
+        u.right = Math.max(u.right, r.right);
+        u.bottom = Math.max(u.bottom, r.bottom);
+      }
+    });
+    const wr2 = wrapper.getBoundingClientRect();
+    const mx = (u.left + u.right) / 2;
+    const my = (u.top + u.bottom) / 2;
+    viewportPanX += (wr2.left + wr2.width / 2) - mx;
+    viewportPanY += (wr2.top + wr2.height / 2) - my;
+    applyViewportTransform();
+  });
+}
 
 // Sidebar extras: UI examples + icon list
 const uiExamplesList = document.getElementById("uiExamplesList");
@@ -157,10 +689,24 @@ const exportIconsTftBtn = document.getElementById("exportIconsTftBtn");
 const exportIconsU8g2Btn = document.getElementById("exportIconsU8g2Btn");
 const iconSizeFilterSelect = document.getElementById("iconSizeFilter");
 const iconCountPill = document.getElementById("iconCountPill");
+
+// Layers panel
+const layersList = document.getElementById("layersList");
+const layersSelectAllBtn = document.getElementById("layersSelectAllBtn");
+const layersClearSelectionBtn = document.getElementById("layersClearSelectionBtn");
 const refreshIconsBtn = document.getElementById("refreshIconsBtn");
 const iconPrevBtn = document.getElementById("iconPrevBtn");
 const iconNextBtn = document.getElementById("iconNextBtn");
 const iconPagePill = document.getElementById("iconPagePill");
+
+// Assets manager (project-local)
+const assetsSearchInput = document.getElementById("assetsSearch");
+const assetsClearSearchBtn = document.getElementById("assetsClearSearchBtn");
+const assetsEmbedToggle = document.getElementById("assetsEmbedToggle");
+const assetsImportBtn = document.getElementById("assetsImportBtn");
+const assetsRemoveUnusedBtn = document.getElementById("assetsRemoveUnusedBtn");
+const assetsList = document.getElementById("assetsList");
+const assetsImportInput = document.getElementById("assetsImportInput");
 
 // Embedded tools overlay (PixelForge / BitCanvas Studio)
 const toolOverlay = document.getElementById("toolOverlay");
@@ -171,6 +717,7 @@ const toolOverlayAction = document.getElementById("toolOverlayAction");
 const toolOverlayOpenNewTab = document.getElementById("toolOverlayOpenNewTab");
 const toolFramePixelForge = document.getElementById("toolFrame_pixelforge");
 const toolFrameBitCanvas = document.getElementById("toolFrame_bitcanvas");
+const toolFrameTftGif = document.getElementById("toolFrame_tftgif");
 const toolSwitchButtons = document.querySelectorAll("[data-switch-tool]");
 
 const EMBEDDED_TOOLS = {
@@ -181,6 +728,10 @@ const EMBEDDED_TOOLS = {
   bitcanvas: {
     label: "BitCanvas Studio (Animation)",
     href: "tools/bitcanvas-studio/index.html"
+  },
+  tftgif: {
+    label: "TFT GIF Converter (Points)",
+    href: "tools/tft-gif-converter/index.html"
   }
 };
 
@@ -213,11 +764,12 @@ function scrollToSelectedElementSettings() {
 function getToolFrameEl(toolKey) {
   if (toolKey === "pixelforge") return toolFramePixelForge;
   if (toolKey === "bitcanvas") return toolFrameBitCanvas;
+  if (toolKey === "tftgif") return toolFrameTftGif;
   return null;
 }
 
 function hideAllToolFrames() {
-  [toolFramePixelForge, toolFrameBitCanvas].forEach((f) => {
+  [toolFramePixelForge, toolFrameBitCanvas, toolFrameTftGif].forEach((f) => {
     if (f) f.classList.add("hidden");
   });
 }
@@ -268,7 +820,7 @@ function buildEmbeddedToolUrl(baseHref) {
 function syncEmbeddedToolTheme(theme) {
   if (!toolOverlay) return;
   // Sync to any loaded frames; this keeps them consistent even while hidden.
-  const frames = [toolFramePixelForge, toolFrameBitCanvas].filter(Boolean);
+  const frames = [toolFramePixelForge, toolFrameBitCanvas, toolFrameTftGif].filter(Boolean);
   frames.forEach((frame) => {
     try {
       frame.contentWindow?.postMessage({ type: "displaykitTheme", theme }, "*");
@@ -386,6 +938,20 @@ function importRgb565ImageToDisplayKit({ symbol, w, h, rgb565 }) {
   const y = Math.max(0, Math.round((dispHeight - h) / 2));
   const previewUrl = rgb565ToDataUrl(w, h, rgb565);
 
+  // Register asset (embedded by default for imported headers)
+  const assetId = "asset_" + Math.random().toString(36).slice(2, 10);
+  assets.push({
+    id: assetId,
+    name: symbol || ("image_" + assetId),
+    kind: "image",
+    dataUrl: previewUrl,
+    sourceName: symbol || "",
+    width: w,
+    height: h,
+    rgb565: Array.from(rgb565),
+  });
+  ensureAssetsDefaults();
+
   const el = {
     id,
     type: "image",
@@ -404,6 +970,7 @@ function importRgb565ImageToDisplayKit({ symbol, w, h, rgb565 }) {
     imageHeight: h,
     rgb565,
     previewUrl,
+    assetId,
     font: getCurrentDriverMode() === "tft" ? DEFAULT_TFT_FONT : DEFAULT_U8G2_FONT
   };
 
@@ -414,6 +981,7 @@ function importRgb565ImageToDisplayKit({ symbol, w, h, rgb565 }) {
   renderElements();
   updatePropsInputs();
   updateCode();
+  renderAssets();
   pushHistory();
 }
 
@@ -577,6 +1145,355 @@ if (window.matchMedia) {
       setTheme(e.matches ? "dark" : "light");
     }
   });
+}
+
+// --- Figma-like UI wiring (tabs + tool buttons) ---
+if (inspectorTabBtns && inspectorTabBtns.length) {
+  inspectorTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => setInspectorTab(btn.getAttribute("data-inspector-tab")));
+  });
+  setInspectorTab("project");
+}
+
+if (toolSelectBtn) toolSelectBtn.addEventListener("click", () => setActiveTool("select"));
+if (toolHandBtn) toolHandBtn.addEventListener("click", () => setActiveTool("hand"));
+setActiveTool("select");
+
+if (layersSelectAllBtn) {
+  layersSelectAllBtn.addEventListener("click", () => {
+    selectedIds = new Set(elements.map((e) => e.id));
+    selectedId = elements.length ? elements[elements.length - 1].id : null;
+    updatePropsInputs();
+    renderElements();
+    renderLayers();
+    pushHistory();
+  });
+}
+if (layersClearSelectionBtn) {
+  layersClearSelectionBtn.addEventListener("click", () => {
+    selectedIds = new Set();
+    selectedId = null;
+    updatePropsInputs();
+    renderElements();
+    renderLayers();
+    pushHistory();
+  });
+}
+
+// --- Pan / zoom (Figma-like) ---
+function setZoom(newZoom) {
+  const z = clamp(newZoom, 0.5, 3);
+  zoomFactor = z;
+  if (zoomSlider) zoomSlider.value = String(Math.round(zoomFactor * 100));
+  if (zoomInput) zoomInput.value = String(Math.round(zoomFactor * 100));
+  applyViewportTransform();
+  if (driverMode === "u8g2") {
+    // OLED zoom is applied by recomputing integer scale.
+    updatePreviewSize();
+    renderElements();
+    renderLayers();
+  }
+}
+
+function zoomAtPoint(clientX, clientY, newZoom) {
+  const wrapper = document.querySelector(".preview-wrapper");
+  if (!wrapper || !previewViewport) {
+    setZoom(newZoom);
+    return;
+  }
+  // OLED: zoom is pixel-perfect via updatePreviewSize, so skip cursor-anchored transform math.
+  if (driverMode === "u8g2") {
+    setZoom(newZoom);
+    return;
+  }
+  const rect = wrapper.getBoundingClientRect();
+  const px = clientX - rect.left;
+  const py = clientY - rect.top;
+  const oldZ = clamp(zoomFactor || 1, 0.5, 3);
+  const targetZ = clamp(newZoom, 0.5, 3);
+  const wx = (px - viewportPanX) / oldZ;
+  const wy = (py - viewportPanY) / oldZ;
+  viewportPanX = px - wx * targetZ;
+  viewportPanY = py - wy * targetZ;
+  zoomFactor = targetZ;
+  if (zoomSlider) zoomSlider.value = String(Math.round(zoomFactor * 100));
+  if (zoomInput) zoomInput.value = String(Math.round(zoomFactor * 100));
+  applyViewportTransform();
+}
+
+document.addEventListener("keydown", (e) => {
+  const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : "";
+  const isTyping = ["input", "textarea", "select"].includes(tag);
+  if (e.key === " " && !isTyping) {
+    // Prevent page scroll; use Space as temporary hand tool (Figma-like)
+    e.preventDefault();
+    isSpaceDown = true;
+    updateCanvasCursorClass();
+  }
+  if ((e.key === "v" || e.key === "V") && !isTyping) {
+    setActiveTool("select");
+  }
+  if ((e.key === "h" || e.key === "H") && !isTyping) {
+    setActiveTool("hand");
+  }
+  // (Pen tool removed)
+
+  // Grouping shortcuts (Figma-ish)
+  if (!isTyping && (e.ctrlKey || e.metaKey) && (e.key === "g" || e.key === "G")) {
+    e.preventDefault();
+    if (e.shiftKey) ungroupSelection();
+    else groupSelection();
+  }
+});
+document.addEventListener("keyup", (e) => {
+  const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : "";
+  const isTyping = ["input", "textarea", "select"].includes(tag);
+  if (e.key === " " && !isTyping) {
+    isSpaceDown = false;
+    updateCanvasCursorClass();
+  }
+});
+
+// Deselect when clicking any empty part of the center canvas (workspace), including
+// OLED canvas, artboard padding, and element children — use closest() not e.target class.
+const canvasWorkspace = document.querySelector(".workspace");
+if (canvasWorkspace) {
+  canvasWorkspace.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    // Don't block deselect: first click should close the menu and still clear selection on empty canvas.
+    if (contextMenu && contextMenu.classList.contains("open")) {
+      closeContextMenu();
+    }
+    const t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest(".ui-element")) return;
+    if (t.closest(".resize-handle")) return;
+    if (t.closest(".ruler-x, .ruler-y, .ruler-corner")) return;
+    if (!(selectedId || (selectedIds && selectedIds.size))) return;
+    selectedId = null;
+    selectedIds = new Set();
+    updatePropsInputs();
+    renderElements();
+    renderLayers();
+    pushHistory();
+  });
+
+  // After using sidebar/inspector, right-click on empty canvas clears selection (no browser menu).
+  canvasWorkspace.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest(".resize-handle")) return;
+    const hit = t.closest(".ui-element");
+    if (!hit) {
+      closeContextMenu();
+      if (!(selectedId || (selectedIds && selectedIds.size))) return;
+      selectedId = null;
+      selectedIds = new Set();
+      updatePropsInputs();
+      renderElements();
+      renderLayers();
+      pushHistory();
+      return;
+    }
+    const id = hit.dataset.id;
+    if (id && (!selectedIds || !selectedIds.has(id))) {
+      selectElement(id, false);
+    }
+    openContextMenu(e.clientX, e.clientY);
+  });
+}
+
+// Pen tool: click on canvas to add points
+// (Pen tool removed)
+
+if (previewViewport) {
+  const wrapper = document.querySelector(".preview-wrapper");
+  if (wrapper) {
+    wrapper.addEventListener("wheel", (e) => {
+      // Ctrl/Cmd + wheel zoom (like Figma)
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY;
+        const factor = Math.exp(-delta * 0.0015);
+        zoomAtPoint(e.clientX, e.clientY, (zoomFactor || 1) * factor);
+      } else {
+        // Wheel pans the artboard (prevent page scroll)
+        e.preventDefault();
+        viewportPanX -= e.deltaX;
+        viewportPanY -= e.deltaY;
+        applyViewportTransform();
+      }
+    }, { passive: false });
+
+    // Clicking empty toolbar areas should also clear selection.
+    // (But never clear when clicking real controls/inputs.)
+    document.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      if (contextMenu && contextMenu.classList.contains("open")) return;
+      if (!(selectedId || (selectedIds && selectedIds.size))) return;
+
+      const t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest(".ui-element") || t.closest(".resize-handle")) return;
+      if (t.closest(".tool-overlay") || t.closest("#contextMenu")) return;
+
+      // If user clicked an interactive control, keep selection.
+      if (t.closest("button,a,input,select,textarea,label,[role='tab']")) return;
+
+      const inToolbar = t.closest(".top-bar");
+      const inSidebar = t.closest(".sidebar");
+      if (!inToolbar && !inSidebar) return;
+
+      selectedId = null;
+      selectedIds = new Set();
+      updatePropsInputs();
+      renderElements();
+      renderLayers();
+      pushHistory();
+    }, true);
+
+    wrapper.addEventListener("mousedown", (e) => {
+      // Middle mouse (wheel click) drag: always pan, even over elements
+      if (e.button === 1) {
+        e.preventDefault();
+        isPanning = true;
+        panStart = { x: e.clientX, y: e.clientY, panX: viewportPanX, panY: viewportPanY };
+        document.body.style.cursor = "grabbing";
+        updateCanvasCursorClass();
+        return;
+      }
+      if (e.button !== 0) return;
+      // Only pan when on background (not dragging an element handle), and when hand tool or space is held.
+      const wantsPan = activeTool === "hand" || isSpaceDown;
+      if (!wantsPan) return;
+      const t = e.target;
+      if (t && t.closest && (t.closest(".ui-element") || t.closest(".resize-handle"))) {
+        return;
+      }
+      isPanning = true;
+      panStart = { x: e.clientX, y: e.clientY, panX: viewportPanX, panY: viewportPanY };
+      document.body.style.cursor = "grabbing";
+      updateCanvasCursorClass();
+      e.preventDefault();
+    });
+
+    // Drag from rulers to create guides (Shift+drag on ruler)
+    wrapper.addEventListener("mousedown", (e) => {
+      if (!e.shiftKey) return;
+      const onRulerX = rulerX && (e.target === rulerX || (rulerX.contains && rulerX.contains(e.target)));
+      const onRulerY = rulerY && (e.target === rulerY || (rulerY.contains && rulerY.contains(e.target)));
+      if (!onRulerX && !onRulerY) return;
+      const scale = parseFloat(preview.dataset.scale || "1");
+      const previewRect = preview.getBoundingClientRect();
+      const pos = onRulerX ? (e.clientX - previewRect.left) / scale : (e.clientY - previewRect.top) / scale;
+      const g = { id: makeId(), orient: onRulerX ? "v" : "h", pos: Math.max(0, Math.round(pos)) };
+      guides.push(g);
+      renderGuides();
+      pushHistory();
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    wrapper.addEventListener("mousedown", (e) => {
+      // Marquee selection: drag on empty space while in Select tool.
+      if (e.button !== 0) return;
+      if (activeTool !== "select" || isSpaceDown) return;
+      const t = e.target;
+      if (t && t.closest && (t.closest(".ui-element") || t.closest(".resize-handle"))) {
+        return;
+      }
+      const box = ensureMarqueeEl();
+      if (!box) return;
+      isMarqueeSelecting = true;
+      marqueeStart = { x: e.clientX, y: e.clientY, shift: !!e.shiftKey };
+      box.style.display = "block";
+      box.style.left = "0px";
+      box.style.top = "0px";
+      box.style.width = "0px";
+      box.style.height = "0px";
+      e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!isPanning || !panStart) return;
+      viewportPanX = panStart.panX + (e.clientX - panStart.x);
+      viewportPanY = panStart.panY + (e.clientY - panStart.y);
+      applyViewportTransform();
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (!isMarqueeSelecting || !marqueeStart) return;
+      const box = ensureMarqueeEl();
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const x1 = marqueeStart.x - wrapperRect.left;
+      const y1 = marqueeStart.y - wrapperRect.top;
+      const x2 = e.clientX - wrapperRect.left;
+      const y2 = e.clientY - wrapperRect.top;
+      const left = Math.min(x1, x2);
+      const top = Math.min(y1, y2);
+      const w = Math.abs(x2 - x1);
+      const h = Math.abs(y2 - y1);
+      box.style.left = left + "px";
+      box.style.top = top + "px";
+      box.style.width = w + "px";
+      box.style.height = h + "px";
+    });
+    document.addEventListener("mouseup", () => {
+      if (!isPanning) return;
+      isPanning = false;
+      panStart = null;
+      document.body.style.cursor = "";
+      updateCanvasCursorClass();
+    });
+    document.addEventListener("mouseup", (e) => {
+      if (!isMarqueeSelecting) return;
+      isMarqueeSelecting = false;
+      const box = ensureMarqueeEl();
+      if (box) box.style.display = "none";
+
+      const scale = parseFloat(preview.dataset.scale || "1");
+      const z = clamp(zoomFactor || 1, 0.5, 3);
+      const effectiveScale = scale * z;
+      const previewRect = preview.getBoundingClientRect();
+      const lx1 = (marqueeStart.x - previewRect.left) / effectiveScale;
+      const ly1 = (marqueeStart.y - previewRect.top) / effectiveScale;
+      const lx2 = (e.clientX - previewRect.left) / effectiveScale;
+      const ly2 = (e.clientY - previewRect.top) / effectiveScale;
+      const rx = Math.min(lx1, lx2);
+      const ry = Math.min(ly1, ly2);
+      const rw = Math.abs(lx2 - lx1);
+      const rh = Math.abs(ly2 - ly1);
+
+      // Ignore tiny drags (treat as click)
+      if (rw < 2 && rh < 2) {
+        marqueeStart = null;
+        return;
+      }
+
+      const hits = elements
+        .filter((el) => {
+          const ex = el.x, ey = el.y, ew = el.w, eh = el.h;
+          return ex < rx + rw && ex + ew > rx && ey < ry + rh && ey + eh > ry;
+        })
+        .map((el) => el.id);
+
+      if (!marqueeStart.shift) {
+        selectedIds = new Set(hits);
+      } else {
+        if (!selectedIds || !(selectedIds instanceof Set)) selectedIds = new Set();
+        hits.forEach((id) => {
+          if (selectedIds.has(id)) selectedIds.delete(id);
+          else selectedIds.add(id);
+        });
+      }
+      selectedId = hits[hits.length - 1] || (selectedIds.size ? Array.from(selectedIds)[selectedIds.size - 1] : null);
+      updatePropsInputs();
+      renderElements();
+      renderLayers();
+      pushHistory();
+      marqueeStart = null;
+    });
+  }
 }
 
 
@@ -875,6 +1792,63 @@ function ensureAllElementsHaveFonts() {
   });
 }
 
+function ensureElementDefaults(el) {
+  if (!el) return;
+  if (!el.id) el.id = makeId();
+  if (el.rotation == null) el.rotation = 0;
+
+  // Text improvements (backwards compatible)
+  if (el.textAlign == null) el.textAlign = "left"; // left|center|right
+  if (el.vAlign == null) el.vAlign = "top"; // top|middle|bottom
+  if (el.textAutoSize == null) el.textAutoSize = false;
+  if (el.lineHeight == null) el.lineHeight = 12;
+
+  // Path / advanced shape defaults (used by new tools)
+  if (el.type === "path") {
+    if (!Array.isArray(el.points)) el.points = [];
+    if (el.closed == null) el.closed = false;
+    if (el.strokeWidth == null) el.strokeWidth = 1;
+  }
+  if (el.type === "polygon") {
+    if (el.sides == null) el.sides = 6;
+  }
+  if (el.type === "arc" || el.type === "gauge") {
+    if (el.startAngle == null) el.startAngle = -90;
+    if (el.endAngle == null) el.endAngle = 90;
+    if (el.thickness == null) el.thickness = 4;
+    if (el.minValue == null) el.minValue = 0;
+    if (el.maxValue == null) el.maxValue = 100;
+  }
+
+  // Grouping / auto-layout placeholders (phase 1)
+  if (el.groupId == null) el.groupId = null;
+  if (el.autoLayout == null) el.autoLayout = null;
+
+  // Assets: migrate legacy image/icon fields into asset references when possible
+  if ((el.type === "image" || el.type === "icon") && !el.assetId) {
+    // If element already has embedded data (rgb565/monoBitmap), keep as-is. Asset manager will allow import later.
+    el.assetId = null;
+  }
+}
+
+function ensureAllElementDefaults() {
+  (screens || []).forEach((scr) => {
+    if (!scr) return;
+    if (!Array.isArray(scr.elements)) scr.elements = [];
+    scr.elements.forEach((el) => ensureElementDefaults(el));
+  });
+}
+
+function ensureAssetsDefaults() {
+  if (!Array.isArray(assets)) assets = [];
+  assets.forEach((a) => {
+    if (!a) return;
+    if (!a.id) a.id = "asset_" + Math.random().toString(36).slice(2, 10);
+    if (!a.kind) a.kind = "image";
+    if (!a.name) a.name = a.sourceName || a.id;
+  });
+}
+
 
 function makeId() {
   return "el_" + Math.random().toString(36).substr(2, 9);
@@ -885,6 +1859,7 @@ function deepCloneState() {
     JSON.stringify({
       screens,
       activeScreenId,
+      assets,
       dispWidth,
       dispHeight,
       bgColor,
@@ -904,6 +1879,7 @@ function applyStateSnapshot(snap) {
   historyLocked = true;
   screens = snap.screens || [];
   activeScreenId = snap.activeScreenId || (screens[0] && screens[0].id) || null;
+  assets = snap.assets || [];
   dispWidth = snap.dispWidth || 240;
   dispHeight = snap.dispHeight || 320;
   bgColor = snap.bgColor || "#000000";
@@ -912,6 +1888,8 @@ function applyStateSnapshot(snap) {
   gridSize = snap.gridSize || 4;
   driverMode = snap.driverMode || "tft";
   u8g2PresetId = snap.u8g2PresetId || "ssd1306_128x64_i2c_f";
+  ensureAssetsDefaults();
+  ensureAllElementDefaults();
   ensureAllElementsHaveFonts();
   initFontList();
   tftSettingsState = snap.tftSettingsState || {
@@ -1119,6 +2097,7 @@ function createElementWithDefaults(type, overrides = {}) {
     u8g2Font: DEFAULT_U8G2_FONT,
     iconTintEnabled: false,
     iconTintColor: "#ffffff",
+    rotation: 0,
     ...overrides
   };
 }
@@ -1443,11 +2422,42 @@ function uint16ToHexWord(v) {
   return "0x" + (v & 0xffff).toString(16).padStart(4, "0").toUpperCase();
 }
 
-async function exportAllIconsTftRgb565() {
-  if (!FILE_ICONS.length) {
-    setIconHint("No icons loaded. Check your icon manifest.");
-    return;
+async function exportAllIconsViaServer(mode) {
+  const label = mode === "tft_rgb565" ? "TFT RGB565" : "U8g2 XBM";
+  setIconHint(`Exporting ${label} (server)…`);
+  const payload = {
+    mode,
+    bg_color: mode === "tft_rgb565" ? bgColor : "#000000",
+    icons: FILE_ICONS.map((ic) => ({ file: ic.file })),
+  };
+  const res = await fetch(new URL("/api/icons/export", window.location.origin), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  let data = {};
+  try {
+    data = await res.json();
+  } catch (_) {
+    /* ignore */
   }
+  if (!res.ok) {
+    const msg =
+      typeof data.detail === "string"
+        ? data.detail
+        : Array.isArray(data.detail)
+          ? data.detail.map((d) => (d && (d.msg || d.message)) || "").join(" ")
+          : res.statusText || `HTTP ${res.status}`;
+    throw new Error(msg || "Server error");
+  }
+  if (!data.ok || typeof data.content !== "string") {
+    throw new Error("Invalid server response.");
+  }
+  downloadText(data.filename, data.content);
+  setIconHint("Exported (server): " + (data.filename || ""));
+}
+
+async function exportAllIconsTftRgb565Client() {
   setIconHint("Exporting TFT RGB565…");
 
   let out = "";
@@ -1487,11 +2497,24 @@ async function exportAllIconsTftRgb565() {
   setIconHint("Exported: displaykit_icons_rgb565.h");
 }
 
-async function exportAllIconsU8g2Xbm() {
+async function exportAllIconsTftRgb565() {
   if (!FILE_ICONS.length) {
     setIconHint("No icons loaded. Check your icon manifest.");
     return;
   }
+  if (document.documentElement.dataset.displaykitApi === "1") {
+    try {
+      await exportAllIconsViaServer("tft_rgb565");
+      return;
+    } catch (e) {
+      console.warn("Server TFT icon export failed, using browser:", e);
+      setIconHint("Server export failed — using browser.");
+    }
+  }
+  await exportAllIconsTftRgb565Client();
+}
+
+async function exportAllIconsU8g2XbmClient() {
   setIconHint("Exporting U8g2 XBM…");
 
   let out = "";
@@ -1531,6 +2554,23 @@ async function exportAllIconsU8g2Xbm() {
 
   downloadText("displaykit_icons_xbm.h", out);
   setIconHint("Exported: displaykit_icons_xbm.h");
+}
+
+async function exportAllIconsU8g2Xbm() {
+  if (!FILE_ICONS.length) {
+    setIconHint("No icons loaded. Check your icon manifest.");
+    return;
+  }
+  if (document.documentElement.dataset.displaykitApi === "1") {
+    try {
+      await exportAllIconsViaServer("u8g2_xbm");
+      return;
+    } catch (e) {
+      console.warn("Server U8g2 icon export failed, using browser:", e);
+      setIconHint("Server export failed — using browser.");
+    }
+  }
+  await exportAllIconsU8g2XbmClient();
 }
 
 let uiExamplesActiveTab = "tft"; // "tft" | "oled"
@@ -1946,6 +2986,33 @@ async function addIconElement(icon) {
     monoBitmap: monoBitmap || undefined
   });
 
+  // Register asset for project re-use (embed PNG only if toggle is on and we can)
+  try {
+    const embed = assetsEmbedToggle ? !!assetsEmbedToggle.checked : false;
+    const assetId = "asset_" + Math.random().toString(36).slice(2, 10);
+    let dataUrl = null;
+    if (embed) {
+      // Best effort: reuse existing URL as dataUrl only if already a data: URL (otherwise keep null).
+      dataUrl = String(el.iconSrc || "").startsWith("data:") ? el.iconSrc : null;
+    }
+    assets.push({
+      id: assetId,
+      name: safeSymbolFromPath(icon.file),
+      kind: "icon",
+      dataUrl,
+      sourceName: icon.file,
+      width: iw,
+      height: ih,
+      rgb565: rgb565 || undefined,
+      monoBitmap: monoBitmap || undefined,
+    });
+    ensureAssetsDefaults();
+    el.assetId = assetId;
+    renderAssets();
+  } catch {
+    // ignore
+  }
+
   elements.push(el);
   syncActiveScreenElements();
   selectedId = el.id;
@@ -1953,6 +3020,7 @@ async function addIconElement(icon) {
   renderElements();
   updatePropsInputs();
   updateCode();
+  renderAssets();
   pushHistory();
   scrollToSelectedElementSettings();
 }
@@ -2036,11 +3104,13 @@ function setActiveScreen(id, push = true) {
   activeScreenId = id;
   elements = screen.elements;
   selectedId = null;
+  selectedIds = new Set();
   refreshScreenUI();
   screenSelect.value = id;
   screenFnNameInput.value = screen.fnName || "";
   updatePreviewSize();
   renderElements();
+  renderLayers();
   updatePropsInputs();
   updateCode();
   if (push) pushHistory();
@@ -2065,9 +3135,93 @@ function initScreens() {
   }
   updatePreviewSize();
   renderElements();
+  renderLayers();
   updatePropsInputs();
   updateCode();
   pushHistory();
+}
+
+// Render assets once on boot (after initScreens runs).
+try { renderAssets(); } catch (_) {}
+
+// Assets UI wiring
+if (assetsImportBtn && assetsImportInput) {
+  assetsImportBtn.addEventListener("click", () => {
+    assetsImportInput.value = "";
+    assetsImportInput.click();
+  });
+}
+if (assetsImportInput) {
+  assetsImportInput.addEventListener("change", async (e) => {
+    const files = Array.from((e.target && e.target.files) ? e.target.files : []).filter(Boolean);
+    if (!files.length) return;
+    const embed = assetsEmbedToggle ? !!assetsEmbedToggle.checked : true;
+
+    for (const file of files) {
+      if (!/\.png$/i.test(file.name || "")) continue;
+      const dataUrl = await new Promise((resolve) => {
+        if (!embed) return resolve(null);
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = () => resolve(null);
+        r.readAsDataURL(file);
+      });
+
+      // Try to get dimensions + derived exports
+      let w = 0, h = 0, rgb565 = null, monoBitmap = null;
+      try {
+        if (dataUrl) {
+          const converted = await loadPngToRgb565(String(dataUrl), bgColor, null, null, null);
+          w = converted.w; h = converted.h;
+          rgb565 = converted.rgb565;
+          monoBitmap = converted.monoBitmap;
+        } else {
+          // If not embedded, we can still read dimensions by loading into an Image from blob URL
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+          await new Promise((res, rej) => {
+            img.onload = () => res();
+            img.onerror = () => rej(new Error("load"));
+            img.src = url;
+          });
+          w = img.naturalWidth || img.width || 0;
+          h = img.naturalHeight || img.height || 0;
+          URL.revokeObjectURL(url);
+        }
+      } catch {
+        // leave as-is
+      }
+
+      const id = "asset_" + Math.random().toString(36).slice(2, 10);
+      assets.push({
+        id,
+        name: normalizeIconNameFromFile(file) || file.name,
+        kind: "image",
+        dataUrl: dataUrl || null,
+        sourceName: file.name,
+        width: w || undefined,
+        height: h || undefined,
+        rgb565: rgb565 || undefined,
+        monoBitmap: monoBitmap || undefined,
+      });
+    }
+
+    ensureAssetsDefaults();
+    renderAssets();
+    pushHistory();
+  });
+}
+if (assetsSearchInput) {
+  assetsSearchInput.addEventListener("input", () => renderAssets());
+}
+if (assetsClearSearchBtn) {
+  assetsClearSearchBtn.addEventListener("click", () => {
+    if (assetsSearchInput) assetsSearchInput.value = "";
+    renderAssets();
+  });
+}
+if (assetsRemoveUnusedBtn) {
+  assetsRemoveUnusedBtn.addEventListener("click", () => removeUnusedAssets());
 }
 
 function initU8g2Presets() {
@@ -2120,11 +3274,10 @@ function updatePreviewSize() {
     availableWidth / dispWidth,
     availableHeight / dispHeight
   );
-  const rawScale = baseScale * zoomFactor;
   // OLED should scale by an integer so everything snaps to the pixel grid.
   const scale = driverMode === "u8g2"
-    ? Math.max(1, Math.floor(rawScale))
-    : rawScale;
+    ? Math.max(1, Math.floor(baseScale * clamp(zoomFactor || 1, 0.5, 3)))
+    : baseScale;
 
   preview.style.width = dispWidth * scale + "px";
   preview.style.height = dispHeight * scale + "px";
@@ -2150,6 +3303,93 @@ function updatePreviewSize() {
   preview.dataset.scale = scale;
   const driverLabel = driverMode === "u8g2" ? "U8g2 OLED" : "TFT_eSPI";
   displayInfo.textContent = `${driverLabel} · ${dispWidth}x${dispHeight} px`;
+
+  applyViewportTransform();
+  // Rulers + guides need to follow rendered size
+  setTimeout(() => {
+    try { ensureRulers(); } catch (_) {}
+  }, 0);
+  setTimeout(() => {
+    try { renderGuides(); } catch (_) {}
+  }, 0);
+}
+
+function addAssetElementToCanvas(assetId) {
+  const a = (assets || []).find((x) => x && x.id === assetId);
+  if (!a) return;
+  const w = a.width || 32;
+  const h = a.height || 32;
+  const x = Math.max(0, Math.round((dispWidth - w) / 2));
+  const y = Math.max(0, Math.round((dispHeight - h) / 2));
+  const id = makeId();
+
+  if (a.kind === "icon") {
+    const el = createElementWithDefaults("icon", {
+      id,
+      x,
+      y,
+      w,
+      h,
+      assetId,
+      iconSrc: a.dataUrl || "",
+      imageName: `icon_${safeSymbolFromPath(a.sourceName || a.name || a.id)}_${id.replace(/[^a-zA-Z0-9_]/g, "_")}`,
+      imageWidth: w,
+      imageHeight: h,
+      rgb565: a.rgb565 || undefined,
+      monoBitmap: a.monoBitmap || undefined,
+    });
+    elements.push(el);
+  } else {
+    const el = createElementWithDefaults("image", {
+      id,
+      x,
+      y,
+      w,
+      h,
+      assetId,
+      previewUrl: a.dataUrl || "",
+      imageName: `img_${id.replace(/[^a-zA-Z0-9_]/g, "_")}`,
+      imageWidth: w,
+      imageHeight: h,
+      rgb565: a.rgb565 || undefined,
+    });
+    elements.push(el);
+  }
+
+  syncActiveScreenElements();
+  selectedId = id;
+  selectedIds = new Set([id]);
+  updatePreviewSize();
+  renderElements();
+  renderLayers();
+  updatePropsInputs();
+  updateCode();
+  pushHistory();
+  setInspectorTab("selection");
+}
+
+function deleteAsset(assetId) {
+  if (!assetId) return;
+  const used = (screens || []).some((scr) => (scr.elements || []).some((el) => el && el.assetId === assetId));
+  if (used) {
+    alert("This asset is used by one or more elements. Remove those elements first (or change their asset) before deleting.");
+    return;
+  }
+  assets = (assets || []).filter((a) => a && a.id !== assetId);
+  renderAssets();
+  pushHistory();
+}
+
+function removeUnusedAssets() {
+  const used = new Set();
+  (screens || []).forEach((scr) => (scr.elements || []).forEach((el) => { if (el && el.assetId) used.add(el.assetId); }));
+  const before = (assets || []).length;
+  assets = (assets || []).filter((a) => a && used.has(a.id));
+  const after = (assets || []).length;
+  if (before !== after) {
+    renderAssets();
+    pushHistory();
+  }
 }
 
 
@@ -2445,6 +3685,31 @@ function renderElements() {
 
   const isOLED = driverMode === "u8g2";
 
+  // Resolve asset references (assetId) into element preview/code fields.
+  // This keeps old projects working while enabling the Assets Manager.
+  const assetById = new Map((assets || []).filter(Boolean).map((a) => [a.id, a]));
+  elements.forEach((el) => {
+    if (!el || !el.assetId) return;
+    const a = assetById.get(el.assetId);
+    if (!a) return;
+    if (el.type === "image") {
+      if (a.dataUrl) el.previewUrl = a.dataUrl;
+      if (a.rgb565) el.rgb565 = a.rgb565;
+      if (a.width && a.height) {
+        el.imageWidth = a.width;
+        el.imageHeight = a.height;
+      }
+    } else if (el.type === "icon") {
+      if (a.dataUrl) el.iconSrc = a.dataUrl;
+      if (a.rgb565) el.rgb565 = a.rgb565;
+      if (a.monoBitmap) el.monoBitmap = a.monoBitmap;
+      if (a.width && a.height) {
+        el.imageWidth = a.width;
+        el.imageHeight = a.height;
+      }
+    }
+  });
+
   // OLED mode: draw everything into a 1:1 canvas and scale it up pixelated.
   let oledCanvasOk = false;
   if (isOLED) {
@@ -2568,9 +3833,18 @@ function renderElements() {
     }
   }
 
+  // SVG overlay for paths (and pen draft)
+  const pathOverlay = getPathOverlay();
+  if (pathOverlay) {
+    // Keep pen draft nodes; clear only element overlay nodes.
+    pathOverlay.querySelectorAll("[data-el-overlay]").forEach((n) => n.remove());
+  }
+
   elements.forEach((el) => {
+    if (el.hidden) return;
     const div = document.createElement("div");
-    div.className = "ui-element" + (el.id === selectedId ? " selected" : "") + (isOLED ? " oled-element" : "");
+    const isSelected = selectedIds && selectedIds.has(el.id);
+    div.className = "ui-element" + (isSelected ? " selected" : "") + (isOLED ? " oled-element" : "");
     div.dataset.id = el.id;
     div.setAttribute("type", el.type); // Add type attribute for CSS targeting
 
@@ -2634,8 +3908,9 @@ function renderElements() {
     if (isOLED && oledCanvasOk && el.type !== "image" && el.type !== "icon") {
       // Skip DOM-based visuals in OLED mode (canvas already drew them).
       enableDrag(div, el.id);
-      if (el.id === selectedId && el.type !== "image" && el.type !== "icon") {
-        addResizeHandles(div, el.id);
+      applyPreviewElementTransform(div, el, isSelected);
+      if (el.id === selectedId) {
+        addResizeHandles(div, el, isOLED, oledCanvasOk);
       }
       div.style.zIndex = el.id === selectedId ? "30" : "10";
       preview.appendChild(div);
@@ -2685,6 +3960,31 @@ function renderElements() {
       // Keep a subtle border for imported images only.
       div.style.border = el.type === "icon" ? "none" : "1px solid rgba(255, 255, 255, 0.1)";
       div.style.borderRadius = "4px";
+    } else if (el.type === "path") {
+      // Paths render via SVG overlay; keep element itself as an interaction box.
+      div.style.background = "transparent";
+      div.style.backgroundColor = "transparent";
+      div.style.border = "1px dashed rgba(255, 0, 204, 0.45)";
+      div.style.boxShadow = "none";
+    } else if (el.type === "triangle" || el.type === "polygon") {
+      div.style.backgroundColor = "transparent";
+      div.style.background = "none";
+      div.style.border = "1px solid " + stroke;
+      div.style.boxShadow = "none";
+      // Preview is approximated by CSS clip-path for triangles and a rounded rect for polygon.
+      if (el.type === "triangle") {
+        div.style.clipPath = "polygon(50% 0%, 100% 100%, 0% 100%)";
+        if (shouldFill) div.style.backgroundColor = fill;
+      } else {
+        // polygon placeholder: render as rounded rect in DOM; SVG overlay will draw real polygon.
+        div.style.borderRadius = "8px";
+        if (shouldFill) div.style.backgroundColor = fill;
+      }
+    } else if (el.type === "arc" || el.type === "gauge") {
+      div.style.backgroundColor = "transparent";
+      div.style.background = "none";
+      div.style.border = "1px solid rgba(255,255,255,0.10)";
+      div.style.boxShadow = "none";
     } else if (el.type === "circle") {
       if (shouldFill) {
         div.style.borderRadius = "50%";
@@ -2699,14 +3999,10 @@ function renderElements() {
       }
       div.style.border = "1px solid " + stroke;
     } else if (el.type === "line") {
-      
-      const angle = Math.atan2(h, w) * (180 / Math.PI);
       div.style.width = Math.sqrt(w * w + h * h) + "px";
       div.style.height = "2px";
       div.style.backgroundColor = stroke;
       div.style.borderRadius = "1px";
-      div.style.transformOrigin = "0 50%";
-      div.style.transform = `rotate(${angle}deg)`;
       div.style.boxShadow = `0 1px 2px rgba(0, 0, 0, 0.2)`;
     } else if (el.type === "divider") {
       // Keep dividers crisp + always visible (avoid fragile background gradients)
@@ -2879,38 +4175,185 @@ function renderElements() {
 
     enableDrag(div, el.id);
     
-    
-    // Only show resize handles for resizable elements.
-    // Images + icons are treated as fixed-size assets (no resize handles).
-    if (el.id === selectedId && el.type !== "image" && el.type !== "icon") {
-      addResizeHandles(div, el.id);
+    // Inline text editing (double-click) for text-like elements
+    if (elementHasText(el.type)) {
+      div.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        beginInlineTextEdit(el.id);
+      });
     }
     
+    
+    // Images + icons: no resize handles; optional rotate (Figma-like) where supported.
+    if (el.id === selectedId) {
+      addResizeHandles(div, el, isOLED, oledCanvasOk);
+    }
+
+    applyPreviewElementTransform(div, el, isSelected);
     preview.appendChild(div);
   });
+
+  // Render path geometry (SVG) on top of DOM boxes
+  if (pathOverlay) {
+    (elements || []).forEach((el) => {
+      if (!el || el.hidden) return;
+      const isSelected = selectedIds && selectedIds.has(el.id);
+
+      if (el.type === "path") {
+        if (!Array.isArray(el.points) || el.points.length < 2) return;
+        const pts = el.points;
+        const d = pts
+          .map((p, i) => `${i === 0 ? "M" : "L"} ${Math.round(p.x)} ${Math.round(p.y)}`)
+          .join(" ") + (el.closed ? " Z" : "");
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p.setAttribute("data-el-overlay", "1");
+        p.setAttribute("d", d);
+        p.setAttribute("fill", "none");
+        p.setAttribute("stroke", "#ff00cc");
+        p.setAttribute("stroke-width", String(Math.max(1, Number(el.strokeWidth || 1))));
+        p.setAttribute("stroke-linecap", "round");
+        p.setAttribute("stroke-linejoin", "round");
+        p.style.opacity = isSelected ? "1" : "0.85";
+        pathOverlay.appendChild(p);
+        return;
+      }
+
+      // Triangle / polygon / arc / gauge rendered as overlays for a nicer preview
+      if (el.type === "triangle") {
+        const x = el.x, y = el.y, w = el.w, h = el.h;
+        const d = `M ${x + w / 2} ${y} L ${x + w} ${y + h} L ${x} ${y + h} Z`;
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p.setAttribute("data-el-overlay", "1");
+        p.setAttribute("d", d);
+        p.setAttribute("fill", (el.fillAlpha != null && el.fillAlpha <= 0) ? "none" : (el.fillColor || "#ffffff"));
+        p.setAttribute("fill-opacity", String((el.fillAlpha != null ? el.fillAlpha : 255) / 255));
+        p.setAttribute("stroke", el.strokeColor || "#ffffff");
+        p.setAttribute("stroke-width", "1");
+        p.style.opacity = isSelected ? "1" : "0.9";
+        pathOverlay.appendChild(p);
+        return;
+      }
+
+      if (el.type === "polygon") {
+        const sides = Math.max(3, Math.min(32, parseInt(el.sides || 6, 10) || 6));
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h / 2;
+        const rx = el.w / 2;
+        const ry = el.h / 2;
+        const rot = (Number(el.rotation) || 0) * Math.PI / 180;
+        const pts = [];
+        for (let i = 0; i < sides; i++) {
+          const a = rot + (i * Math.PI * 2) / sides - Math.PI / 2;
+          pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
+        }
+        const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0]} ${p[1]}`).join(" ") + " Z";
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p.setAttribute("data-el-overlay", "1");
+        p.setAttribute("d", d);
+        p.setAttribute("fill", (el.fillAlpha != null && el.fillAlpha <= 0) ? "none" : (el.fillColor || "#ffffff"));
+        p.setAttribute("fill-opacity", String((el.fillAlpha != null ? el.fillAlpha : 255) / 255));
+        p.setAttribute("stroke", el.strokeColor || "#ffffff");
+        p.setAttribute("stroke-width", "1");
+        p.style.opacity = isSelected ? "1" : "0.9";
+        pathOverlay.appendChild(p);
+        return;
+      }
+
+      if (el.type === "arc" || el.type === "gauge") {
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h;
+        const r = Math.min(el.w, el.h * 2) / 2;
+        const start = (Number(el.startAngle) || -90) * Math.PI / 180;
+        const end = (Number(el.endAngle) || 90) * Math.PI / 180;
+        const sx = cx + Math.cos(start) * r;
+        const sy = cy + Math.sin(start) * r;
+        const ex = cx + Math.cos(end) * r;
+        const ey = cy + Math.sin(end) * r;
+        const large = Math.abs(end - start) > Math.PI ? 1 : 0;
+        const sweep = end > start ? 1 : 0;
+        const d = `M ${sx} ${sy} A ${r} ${r} 0 ${large} ${sweep} ${ex} ${ey}`;
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p.setAttribute("data-el-overlay", "1");
+        p.setAttribute("d", d);
+        p.setAttribute("fill", "none");
+        p.setAttribute("stroke", el.strokeColor || "#ffffff");
+        p.setAttribute("stroke-width", String(Math.max(1, Number(el.thickness || 2))));
+        p.setAttribute("stroke-linecap", "round");
+        p.style.opacity = isSelected ? "1" : "0.9";
+        pathOverlay.appendChild(p);
+
+        if (el.type === "gauge") {
+          const v = Math.max(Number(el.minValue || 0), Math.min(Number(el.maxValue || 100), Number(el.value || 0)));
+          const t = (v - Number(el.minValue || 0)) / Math.max(1, (Number(el.maxValue || 100) - Number(el.minValue || 0)));
+          const a = start + (end - start) * t;
+          const nx = cx + Math.cos(a) * (r - 2);
+          const ny = cy + Math.sin(a) * (r - 2);
+          const needle = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          needle.setAttribute("data-el-overlay", "1");
+          needle.setAttribute("x1", String(cx));
+          needle.setAttribute("y1", String(cy));
+          needle.setAttribute("x2", String(nx));
+          needle.setAttribute("y2", String(ny));
+          needle.setAttribute("stroke", "#ff00cc");
+          needle.setAttribute("stroke-width", "1.5");
+          needle.setAttribute("stroke-linecap", "round");
+          pathOverlay.appendChild(needle);
+        }
+      }
+    });
+  }
+
+  // (Pen tool removed)
+
+  // Multi-selection bounds overlay (preview coords)
+  if (selectedIds && selectedIds.size > 1) {
+    const ids = Array.from(selectedIds);
+    const b = getSelectionBoundsPx(ids);
+    if (b) {
+      const box = document.createElement("div");
+      box.className = "selection-bounds";
+      box.style.left = (b.x * scale) + "px";
+      box.style.top = (b.y * scale) + "px";
+      box.style.width = (b.w * scale) + "px";
+      box.style.height = (b.h * scale) + "px";
+      preview.appendChild(box);
+    }
+  }
 }
 
 
-function addResizeHandles(elementDiv, id) {
-  const handles = [
-    { class: "nw", cursor: "nw-resize" },
-    { class: "ne", cursor: "ne-resize" },
-    { class: "sw", cursor: "sw-resize" },
-    { class: "se", cursor: "se-resize" },
-    { class: "n", cursor: "n-resize" },
-    { class: "s", cursor: "s-resize" },
-    { class: "e", cursor: "e-resize" },
-    { class: "w", cursor: "w-resize" }
-  ];
+function addResizeHandles(elementDiv, el, isOLED, oledCanvasOk) {
+  const id = el.id;
+  if (el.type !== "image" && el.type !== "icon") {
+    const handles = [
+      { class: "nw", cursor: "nw-resize" },
+      { class: "ne", cursor: "ne-resize" },
+      { class: "sw", cursor: "sw-resize" },
+      { class: "se", cursor: "se-resize" },
+      { class: "n", cursor: "n-resize" },
+      { class: "s", cursor: "s-resize" },
+      { class: "e", cursor: "e-resize" },
+      { class: "w", cursor: "w-resize" }
+    ];
 
-  handles.forEach(handle => {
-    const handleDiv = document.createElement("div");
-    handleDiv.className = `resize-handle ${handle.class}`;
-    handleDiv.dataset.handle = handle.class;
-    handleDiv.dataset.elementId = id;
-    enableResize(handleDiv, id, handle.class);
-    elementDiv.appendChild(handleDiv);
-  });
+    handles.forEach((handle) => {
+      const handleDiv = document.createElement("div");
+      handleDiv.className = `resize-handle ${handle.class}`;
+      handleDiv.dataset.handle = handle.class;
+      handleDiv.dataset.elementId = id;
+      enableResize(handleDiv, id, handle.class);
+      elementDiv.appendChild(handleDiv);
+    });
+  }
+
+  if (elementShowsRotationHandle(el, isOLED, oledCanvasOk)) {
+    const rh = document.createElement("div");
+    rh.className = "resize-handle rotate-handle";
+    rh.title = "Rotate (Shift: 15° steps)";
+    enableRotate(rh, id);
+    elementDiv.appendChild(rh);
+  }
 }
 
 function enableResize(handle, elementId, direction) {
@@ -2923,8 +4366,11 @@ function enableResize(handle, elementId, direction) {
   let startYPos = 0;
 
   handle.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
+    const el0 = elements.find((el) => el.id === elementId);
+    if (!el0 || el0.locked || el0.hidden) return;
     isResizing = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -2950,9 +4396,13 @@ function enableResize(handle, elementId, direction) {
 
   function onResizeMove(e) {
     if (!isResizing) return;
+    const elLock = elements.find((el) => el.id === elementId);
+    if (!elLock || elLock.locked || elLock.hidden) return;
     const scale = parseFloat(preview.dataset.scale || "1");
-    const dx = (e.clientX - startX) / scale;
-    const dy = (e.clientY - startY) / scale;
+    const z = clamp(zoomFactor || 1, 0.5, 3);
+    const effectiveScale = scale * z;
+    const dx = (e.clientX - startX) / effectiveScale;
+    const dy = (e.clientY - startY) / effectiveScale;
 
     const el = elements.find((el) => el.id === elementId);
     if (!el) return;
@@ -2979,7 +4429,7 @@ function enableResize(handle, elementId, direction) {
     }
 
     
-    if (snapToGrid && gridSize > 0) {
+    if (snapToGrid && gridSize > 0 && !e.ctrlKey && !e.metaKey) {
       newWidth = Math.round(newWidth / gridSize) * gridSize;
       newHeight = Math.round(newHeight / gridSize) * gridSize;
       newX = Math.round(newX / gridSize) * gridSize;
@@ -2993,7 +4443,9 @@ function enableResize(handle, elementId, direction) {
 
     updatePropsInputs(false);
     renderElements();
+    renderLayers();
     updateCode();
+    updateDistanceHintsForDrag(elementId, el.x, el.y, el.w, el.h);
   }
 
   function onResizeUp() {
@@ -3008,9 +4460,62 @@ function enableResize(handle, elementId, direction) {
       elementDiv.classList.remove('resizing');
     }
     preview.classList.remove('manipulating');
+    hideSnapGuides();
+    clearDistanceHints();
 
     document.removeEventListener("mousemove", onResizeMove);
     document.removeEventListener("mouseup", onResizeUp);
+  }
+}
+
+function enableRotate(handle, elementId) {
+  let rotating = false;
+  let startAngleDeg = 0;
+  let startRot = 0;
+
+  handle.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const el = elements.find((x) => x.id === elementId);
+    if (!el || el.locked || el.hidden) return;
+    rotating = true;
+    const cx = el.x + el.w / 2;
+    const cy = el.y + el.h / 2;
+    const p = clientToArtboardPx(e.clientX, e.clientY);
+    startAngleDeg = Math.atan2(p.y - cy, p.x - cx) * (180 / Math.PI);
+    startRot = Number(el.rotation) || 0;
+    preview.classList.add("manipulating");
+    document.addEventListener("mousemove", onRotMove);
+    document.addEventListener("mouseup", onRotUp);
+  });
+
+  function onRotMove(e) {
+    if (!rotating) return;
+    const el = elements.find((x) => x.id === elementId);
+    if (!el || el.locked || el.hidden) return;
+    const cx = el.x + el.w / 2;
+    const cy = el.y + el.h / 2;
+    const p = clientToArtboardPx(e.clientX, e.clientY);
+    const a1 = Math.atan2(p.y - cy, p.x - cx) * (180 / Math.PI);
+    let delta = a1 - startAngleDeg;
+    while (delta > 180) delta -= 360;
+    while (delta < -180) delta += 360;
+    let rot = startRot + delta;
+    if (e.shiftKey) rot = Math.round(rot / 15) * 15;
+    el.rotation = Math.round(rot);
+    updatePropsInputs(false);
+    renderElements();
+    renderLayers();
+    updateCode();
+  }
+
+  function onRotUp() {
+    if (rotating) pushHistory();
+    rotating = false;
+    preview.classList.remove("manipulating");
+    document.removeEventListener("mousemove", onRotMove);
+    document.removeEventListener("mouseup", onRotUp);
   }
 }
 
@@ -3021,13 +4526,21 @@ function enableDrag(node, id) {
   let startY = 0;
   let origX = 0;
   let origY = 0;
+  let dragIds = [];
+  let dragOrig = new Map(); // id -> {x,y}
 
   node.addEventListener("mousedown", (e) => {
-    if (e.target.classList.contains("resize-handle")) {
+    if (e.button !== 0) return;
+    if (e.target.classList.contains("resize-handle") || e.target.classList.contains("rotate-handle")) {
       return;
     }
+    const el0 = elements.find((el) => el.id === id);
+    if (!el0 || el0.locked || el0.hidden) return;
     e.preventDefault();
-    selectElement(id, false);
+    // If the clicked element isn't part of the current multi-selection, select it.
+    if (!(selectedIds && selectedIds.size > 1 && selectedIds.has(id))) {
+      selectElement(id, false);
+    }
     isDragging = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -3036,6 +4549,19 @@ function enableDrag(node, id) {
     if (!el) return;
     origX = el.x;
     origY = el.y;
+
+    // Multi-drag: move all selected, unlocked, visible elements.
+    dragIds = (selectedIds && selectedIds.size ? Array.from(selectedIds) : [id])
+      .filter((sid) => {
+        const s = elements.find((x) => x.id === sid);
+        return s && !s.locked && !s.hidden;
+      });
+    if (!dragIds.includes(id)) dragIds.push(id);
+    dragOrig = new Map();
+    dragIds.forEach((sid) => {
+      const s = elements.find((x) => x.id === sid);
+      if (s) dragOrig.set(sid, { x: s.x, y: s.y });
+    });
 
     // Add dragging class for visual feedback
     node.classList.add('dragging');
@@ -3048,25 +4574,57 @@ function enableDrag(node, id) {
   function onMouseMove(e) {
     if (!isDragging) return;
     const scale = parseFloat(preview.dataset.scale || "1");
-    let dx = (e.clientX - startX) / scale;
-    let dy = (e.clientY - startY) / scale;
+    const z = clamp(zoomFactor || 1, 0.5, 3);
+    const effectiveScale = scale * z;
+    let dx = (e.clientX - startX) / effectiveScale;
+    let dy = (e.clientY - startY) / effectiveScale;
 
     let newX = origX + dx;
     let newY = origY + dy;
 
-    if (snapToGrid && gridSize > 0) {
+    const suppressSnap = e.ctrlKey || e.metaKey;
+    const snapped = snapMoveToElements(id, newX, newY, { suppressSnap });
+    newX = snapped.x;
+    newY = snapped.y;
+
+    if (snapToGrid && gridSize > 0 && !suppressSnap) {
       newX = Math.round(newX / gridSize) * gridSize;
       newY = Math.round(newY / gridSize) * gridSize;
     }
 
-    const el = elements.find((el) => el.id === id);
-    if (!el) return;
-    el.x = Math.round(newX);
-    el.y = Math.round(newY);
+    const leadOrig = dragOrig.get(id) || { x: origX, y: origY };
+    const ddx = Math.round(newX) - Math.round(leadOrig.x);
+    const ddy = Math.round(newY) - Math.round(leadOrig.y);
+
+    dragIds.forEach((sid) => {
+      const s = elements.find((x) => x.id === sid);
+      const o = dragOrig.get(sid);
+      if (!s || !o) return;
+      s.x = Math.round(o.x + ddx);
+      s.y = Math.round(o.y + ddy);
+    });
+
+    // Snap guides (in preview coordinates)
+    const guides = ensureSnapGuides();
+    if (guides.v && snapped.gx != null) {
+      guides.v.style.left = snapped.gx * scale + "px";
+      guides.v.classList.add("show");
+    } else if (guides.v) {
+      guides.v.classList.remove("show");
+    }
+    if (guides.h && snapped.gy != null) {
+      guides.h.style.top = snapped.gy * scale + "px";
+      guides.h.classList.add("show");
+    } else if (guides.h) {
+      guides.h.classList.remove("show");
+    }
 
     updatePropsInputs(false);
     renderElements();
+    renderLayers();
     updateCode();
+    const elLead = elements.find((x) => x.id === id);
+    if (elLead) updateDistanceHintsForDrag(id, elLead.x, elLead.y, elLead.w, elLead.h);
   }
 
   function onMouseUp() {
@@ -3074,10 +4632,14 @@ function enableDrag(node, id) {
       pushHistory();
     }
     isDragging = false;
+    dragIds = [];
+    dragOrig = new Map();
 
     // Remove dragging class
     node.classList.remove('dragging');
     preview.classList.remove('manipulating');
+    hideSnapGuides();
+    clearDistanceHints();
 
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("mouseup", onMouseUp);
@@ -3087,8 +4649,10 @@ function enableDrag(node, id) {
 
 function selectElement(id, push = true) {
   selectedId = id;
+  selectedIds = new Set([id]);
   updatePropsInputs();
   renderElements();
+  renderLayers();
   if (push) pushHistory();
 
   // Add visual feedback for selection
@@ -3100,6 +4664,372 @@ function selectElement(id, push = true) {
       elementDiv.style.animation = 'pulse 0.3s ease-out';
     }
   }, 50);
+}
+
+function toggleSelectElement(id, push = true) {
+  if (!selectedIds || !(selectedIds instanceof Set)) selectedIds = new Set();
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+  } else {
+    selectedIds.add(id);
+    selectedId = id;
+  }
+  if (!selectedIds.size) selectedId = null;
+  updatePropsInputs();
+  renderElements();
+  renderLayers();
+  if (push) pushHistory();
+}
+
+function getLayerLabel(el) {
+  const t = String(el.type || "element");
+  if (t === "text" || t === "label" || t === "button" || t === "header") {
+    const v = (el.text || "").trim();
+    return v ? `${t}: ${v}` : t;
+  }
+  if (t === "path") return "path";
+  if (t === "triangle") return "triangle";
+  if (t === "polygon") return `polygon ${el.sides || 6}`;
+  if (t === "arc") return "arc";
+  if (t === "gauge") return "gauge";
+  if (t === "icon") return el.iconFile ? `icon: ${safeSymbolFromPath(el.iconFile)}` : "icon";
+  if (t === "image") return el.imageName ? `image: ${el.imageName}` : "image";
+  return t;
+}
+
+function formatAssetMeta(a) {
+  const bits = [];
+  if (a && a.kind) bits.push(a.kind);
+  if (a && a.width && a.height) bits.push(`${a.width}×${a.height}`);
+  if (a && a.dataUrl) bits.push("embedded");
+  return bits.join(" · ");
+}
+
+function renderAssets() {
+  if (!assetsList) return;
+  const q = (assetsSearchInput && assetsSearchInput.value ? assetsSearchInput.value : "").trim().toLowerCase();
+  assetsList.innerHTML = "";
+  const list = (assets || [])
+    .filter(Boolean)
+    .filter((a) => !q || String(a.name || "").toLowerCase().includes(q) || String(a.sourceName || "").toLowerCase().includes(q))
+    .slice()
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "mini-hint";
+    empty.textContent = q ? "No assets match your search." : "No assets yet. Click Import to add PNGs.";
+    assetsList.appendChild(empty);
+    return;
+  }
+
+  list.forEach((a) => {
+    const row = document.createElement("div");
+    row.className = "asset-row";
+    row.dataset.id = a.id;
+
+    const thumb = document.createElement("div");
+    thumb.className = "asset-thumb";
+    if (a.dataUrl) {
+      const img = document.createElement("img");
+      img.alt = a.name || "asset";
+      img.src = a.dataUrl;
+      thumb.appendChild(img);
+    }
+
+    const main = document.createElement("div");
+    main.className = "asset-main";
+    const name = document.createElement("div");
+    name.className = "asset-name";
+    name.textContent = a.name || a.id;
+    const meta = document.createElement("div");
+    meta.className = "asset-meta";
+    meta.textContent = formatAssetMeta(a);
+    main.appendChild(name);
+    main.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "asset-actions";
+
+    const insertBtn = document.createElement("button");
+    insertBtn.type = "button";
+    insertBtn.className = "btn small secondary";
+    insertBtn.textContent = "Add";
+    insertBtn.title = "Add to canvas";
+    insertBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      addAssetElementToCanvas(a.id);
+    });
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "btn small secondary";
+    delBtn.textContent = "Del";
+    delBtn.title = "Delete asset";
+    delBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteAsset(a.id);
+    });
+
+    actions.appendChild(insertBtn);
+    actions.appendChild(delBtn);
+
+    row.appendChild(thumb);
+    row.appendChild(main);
+    row.appendChild(actions);
+
+    // Row click inserts (fast workflow)
+    row.addEventListener("click", () => addAssetElementToCanvas(a.id));
+
+    assetsList.appendChild(row);
+  });
+}
+
+function renderLayers() {
+  if (!layersList) return;
+  layersList.innerHTML = "";
+  // Top of list = front. Our elements array draws in order, so reverse for display.
+  const list = elements.slice().reverse();
+  list.forEach((el) => {
+    const row = document.createElement("div");
+    row.className = "layer-row" + (selectedIds && selectedIds.has(el.id) ? " selected" : "");
+    row.draggable = true;
+    row.dataset.id = el.id;
+
+    const name = document.createElement("div");
+    name.className = "layer-name";
+    name.textContent = getLayerLabel(el);
+
+    const meta = document.createElement("div");
+    meta.className = "layer-meta";
+    meta.textContent = `${Math.round(el.x)},${Math.round(el.y)} ${Math.round(el.w)}×${Math.round(el.h)}`;
+
+    const actions = document.createElement("div");
+    actions.className = "layer-actions";
+
+    const btnHide = document.createElement("button");
+    btnHide.type = "button";
+    btnHide.className = "layer-action-btn" + (el.hidden ? " active" : "");
+    btnHide.title = el.hidden ? "Show layer" : "Hide layer";
+    btnHide.textContent = "H";
+    btnHide.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      el.hidden = !el.hidden;
+      // If hidden, also remove from selection
+      if (el.hidden && selectedIds && selectedIds.has(el.id)) {
+        selectedIds.delete(el.id);
+        if (selectedId === el.id) selectedId = selectedIds.size ? Array.from(selectedIds)[selectedIds.size - 1] : null;
+      }
+      updatePropsInputs(false);
+      renderElements();
+      renderLayers();
+      updateCode();
+      pushHistory();
+    });
+
+    const btnLock = document.createElement("button");
+    btnLock.type = "button";
+    btnLock.className = "layer-action-btn" + (el.locked ? " active" : "");
+    btnLock.title = el.locked ? "Unlock layer" : "Lock layer";
+    btnLock.textContent = "L";
+    btnLock.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      el.locked = !el.locked;
+      renderLayers();
+      pushHistory();
+    });
+
+    actions.appendChild(btnHide);
+    actions.appendChild(btnLock);
+
+    row.appendChild(name);
+    row.appendChild(meta);
+    row.appendChild(actions);
+
+    row.addEventListener("click", (e) => {
+      const id = el.id;
+      if (e.shiftKey) toggleSelectElement(id);
+      else selectElement(id);
+      setInspectorTab("selection");
+    });
+
+    row.addEventListener("dragstart", (e) => {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", el.id);
+    });
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    });
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const draggedId = e.dataTransfer.getData("text/plain");
+      const targetId = el.id;
+      if (!draggedId || draggedId === targetId) return;
+
+      const fromIdx = elements.findIndex((x) => x.id === draggedId);
+      const toIdx = elements.findIndex((x) => x.id === targetId);
+      if (fromIdx < 0 || toIdx < 0) return;
+
+      const [moved] = elements.splice(fromIdx, 1);
+      elements.splice(toIdx, 0, moved);
+      syncActiveScreenElements();
+      renderElements();
+      renderLayers();
+      updateCode();
+      pushHistory();
+    });
+
+    layersList.appendChild(row);
+  });
+}
+
+function beginInlineTextEdit(elementId) {
+  const el = elements.find((e) => e.id === elementId);
+  if (!el || !elementHasText(el.type)) return;
+  const node = document.querySelector(`.ui-element[data-id="${elementId}"]`);
+  if (!node) return;
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = el.text || "";
+  input.className = "inline-text-editor";
+  input.style.position = "absolute";
+  input.style.left = "0";
+  input.style.top = "0";
+  input.style.width = "100%";
+  input.style.height = "100%";
+  input.style.border = "1px solid rgba(255, 109, 31, 0.6)";
+  input.style.borderRadius = "8px";
+  input.style.background = "rgba(0,0,0,0.25)";
+  input.style.color = "inherit";
+  input.style.padding = "6px 8px";
+  input.style.font = "inherit";
+  input.style.outline = "none";
+
+  // Replace visible text while editing
+  const prevText = node.textContent;
+  node.textContent = "";
+  node.appendChild(input);
+  input.focus();
+  input.select();
+
+  const commit = () => {
+    el.text = input.value;
+    node.removeChild(input);
+    node.textContent = prevText; // renderElements will refresh anyway
+    renderElements();
+    renderLayers();
+    updatePropsInputs(false);
+    updateCode();
+    pushHistory();
+  };
+  const cancel = () => {
+    node.removeChild(input);
+    node.textContent = prevText;
+  };
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancel();
+    }
+  });
+  input.addEventListener("blur", () => commit());
+}
+
+function openContextMenu(x, y) {
+  if (!contextMenu) return;
+  contextMenu.classList.add("open");
+  contextMenu.setAttribute("aria-hidden", "false");
+  const pad = 8;
+  const w = contextMenu.offsetWidth || 200;
+  const h = contextMenu.offsetHeight || 220;
+  const maxX = window.innerWidth - w - pad;
+  const maxY = window.innerHeight - h - pad;
+  contextMenu.style.left = clamp(x, pad, maxX) + "px";
+  contextMenu.style.top = clamp(y, pad, maxY) + "px";
+}
+
+function closeContextMenu() {
+  if (!contextMenu) return;
+  contextMenu.classList.remove("open");
+  contextMenu.setAttribute("aria-hidden", "true");
+}
+
+function getSelectedElements() {
+  const ids = selectedIds && selectedIds.size ? Array.from(selectedIds) : (selectedId ? [selectedId] : []);
+  return ids.map((id) => elements.find((e) => e.id === id)).filter(Boolean);
+}
+
+function getAssetById(assetId) {
+  if (!assetId) return null;
+  return (assets || []).find((a) => a && a.id === assetId) || null;
+}
+
+function getRgb565ForElement(el) {
+  if (!el) return null;
+  if (Array.isArray(el.rgb565) && el.rgb565.length) return el.rgb565;
+  const a = getAssetById(el.assetId);
+  if (a && Array.isArray(a.rgb565) && a.rgb565.length) return a.rgb565;
+  return null;
+}
+
+function getMonoBitmapForElement(el) {
+  if (!el) return null;
+  if (Array.isArray(el.monoBitmap) && el.monoBitmap.length) return el.monoBitmap;
+  const a = getAssetById(el.assetId);
+  if (a && Array.isArray(a.monoBitmap) && a.monoBitmap.length) return a.monoBitmap;
+  return null;
+}
+
+function getImageDimsForElement(el) {
+  if (!el) return null;
+  if (el.imageWidth && el.imageHeight) return { w: el.imageWidth, h: el.imageHeight };
+  const a = getAssetById(el.assetId);
+  if (a && a.width && a.height) return { w: a.width, h: a.height };
+  return null;
+}
+
+function getSelectionBoundsPx(ids) {
+  const sels = (ids && ids.length ? ids : (selectedIds && selectedIds.size ? Array.from(selectedIds) : [])).map((id) => elements.find((e) => e.id === id)).filter(Boolean);
+  if (!sels.length) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  sels.forEach((el) => {
+    minX = Math.min(minX, el.x);
+    minY = Math.min(minY, el.y);
+    maxX = Math.max(maxX, el.x + el.w);
+    maxY = Math.max(maxY, el.y + el.h);
+  });
+  return { x: minX, y: minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) };
+}
+
+function groupSelection() {
+  const sels = getSelectedElements().filter((s) => !s.locked && !s.hidden);
+  if (sels.length < 2) return;
+  const gid = makeId();
+  sels.forEach((s) => (s.groupId = gid));
+  renderLayers();
+  renderElements();
+  updateCode();
+  pushHistory();
+}
+
+function ungroupSelection() {
+  const sels = getSelectedElements().filter((s) => !s.locked && !s.hidden);
+  if (!sels.length) return;
+  sels.forEach((s) => (s.groupId = null));
+  renderLayers();
+  renderElements();
+  updateCode();
+  pushHistory();
 }
 
 // Utility function to cycle through elements with Tab key
@@ -3165,6 +5095,15 @@ function refreshActionTargetOptions(el) {
 }
 
 function updatePropsInputs(push = false) {
+  if (selectedIds && selectedIds.size > 1) {
+    noSelection.style.display = "block";
+    noSelection.textContent = `Multiple selected (${selectedIds.size})`;
+    propsPanel.style.display = "none";
+    return;
+  } else if (noSelection && noSelection.textContent && noSelection.textContent.startsWith("Multiple selected")) {
+    noSelection.textContent = "No element selected";
+  }
+
   const el = elements.find((el) => el.id === selectedId);
   if (!el) {
     noSelection.style.display = "block";
@@ -3183,11 +5122,25 @@ function updatePropsInputs(push = false) {
   propY.value = el.y;
   propW.value = el.w;
   propH.value = el.h;
+  if (propRotate) {
+    const rotRow = propRotate.closest(".prop-row");
+    if (rotRow) rotRow.style.display = el.type === "line" ? "none" : "";
+    propRotate.value = Number(el.rotation) || 0;
+    propRotate.disabled = el.type === "line";
+  }
   propText.value = el.text || "";
   propTextSize.value = el.textSize || 2;
+  if (propLineHeight) propLineHeight.value = el.lineHeight != null ? el.lineHeight : 12;
+  if (propTextAutoSize) propTextAutoSize.checked = !!el.textAutoSize;
   propFillColor.value = el.fillColor || "#ffffff";
   propStrokeColor.value = el.strokeColor || "#ffffff";
   propTextColor.value = el.textColor || "#ffffff";
+
+  // Constraints UI
+  if (constraintLeft) constraintLeft.checked = !!(el.constraints && el.constraints.left);
+  if (constraintRight) constraintRight.checked = !!(el.constraints && el.constraints.right);
+  if (constraintTop) constraintTop.checked = !!(el.constraints && el.constraints.top);
+  if (constraintBottom) constraintBottom.checked = !!(el.constraints && el.constraints.bottom);
 
   if (driverMode === "u8g2") {
     // OLED mode: use binary fill control
@@ -3272,6 +5225,11 @@ function generateTFTCode() {
   let code = "";
   code += "#include <TFT_eSPI.h>\n";
   code += "#include <SPI.h>\n\n";
+  code += "// --- Generated by DisplayKit ---\n";
+  code += "// Notes:\n";
+  code += "// - This is a COMPLETE sketch skeleton (setup/loop + screen functions).\n";
+  code += "// - Touch/button interaction is not wired automatically; see `handleUiActions()`.\n";
+  code += "// - Element rotation is a preview-only feature; TFT_eSPI primitives are not rotated.\n\n";
 
   // Collect any GFX FreeFonts used by elements so we can emit the required includes.
   const usedFreeFonts = new Set();
@@ -3297,18 +5255,26 @@ function generateTFTCode() {
   code += "\n";
 
   const bg565 = hexToRgb565(bgColor);
+  code += `static const uint16_t DK_BG = ${bg565};\n\n`;
+
+  // Screen IDs -> indices for basic navigation stubs.
+  const screenIndex = new Map();
+  screens.forEach((s, i) => screenIndex.set(s.id, i));
+  const defaultScreen = screens.find((s) => s.id === activeScreenId) || screens[0];
+  const defaultIndex = defaultScreen ? (screenIndex.get(defaultScreen.id) ?? 0) : 0;
+  code += `enum DkScreenId { ${screens.map((s, i) => `DK_SCREEN_${i}`).join(", ")} };\n`;
+  code += `static DkScreenId g_screen = DK_SCREEN_${defaultIndex};\n`;
+  code += "static bool g_dirty = true;\n";
+  code += "static uint32_t g_lastDrawMs = 0;\n\n";
 
   
   const imageElements = [];
   screens.forEach((scr) => {
     scr.elements.forEach((el) => {
-      if (
-        (el.type === "image" || el.type === "icon") &&
-        el.rgb565 &&
-        el.rgb565.length &&
-        el.imageWidth &&
-        el.imageHeight
-      ) {
+      if (el.type !== "image" && el.type !== "icon") return;
+      const rgb565 = getRgb565ForElement(el);
+      const dims = getImageDimsForElement(el);
+      if (rgb565 && dims && dims.w && dims.h) {
         imageElements.push(el);
       }
     });
@@ -3317,12 +5283,14 @@ function generateTFTCode() {
   
   imageElements.forEach((el) => {
     const name = el.imageName || "img_" + el.id.replace(/[^a-zA-Z0-9_]/g, "_");
-    const totalPixels = el.imageWidth * el.imageHeight;
+    const rgb565 = getRgb565ForElement(el) || [];
+    const dims = getImageDimsForElement(el) || { w: el.imageWidth, h: el.imageHeight };
+    const totalPixels = (dims.w || 0) * (dims.h || 0);
     code += `const uint16_t ${name}[${totalPixels}] PROGMEM = {\n`;
-    for (let i = 0; i < el.rgb565.length; i++) {
-      const val = el.rgb565[i];
+    for (let i = 0; i < rgb565.length; i++) {
+      const val = rgb565[i];
       const hex = "0x" + val.toString(16).padStart(4, "0").toUpperCase();
-      const isLast = i === el.rgb565.length - 1;
+      const isLast = i === rgb565.length - 1;
       if (i % 12 === 0) code += "  ";
       code += hex;
       code += isLast ? "" : ", ";
@@ -3332,15 +5300,15 @@ function generateTFTCode() {
   });
 
   
-  screens.forEach((scr) => {
+  screens.forEach((scr, scrIdx) => {
     const fnName = getScreenFnName(scr);
     const drv = useSprite ? "spr" : "tft";
 
     code += `void ${fnName}() {\n`;
     if (useSprite) {
-      code += `  spr.fillSprite(${bg565});\n`;
+      code += `  spr.fillSprite(DK_BG);\n`;
     } else {
-      code += `  tft.fillScreen(${bg565});\n`;
+      code += `  tft.fillScreen(DK_BG);\n`;
     }
     code += "\n";
 
@@ -3349,9 +5317,11 @@ function generateTFTCode() {
       const val = Math.max(0, Math.min(100, el.value != null ? el.value : 50));
 
       if (el.type === "image" || el.type === "icon") {
-          if (el.rgb565 && el.rgb565.length && el.imageWidth && el.imageHeight) {
+          const rgb565 = getRgb565ForElement(el);
+          const dims = getImageDimsForElement(el);
+          if (rgb565 && rgb565.length && dims && dims.w && dims.h) {
             const name = el.imageName || "img_" + el.id.replace(/[^a-zA-Z0-9_]/g, "_");
-            code += `  ${drv}.pushImage(${el.x}, ${el.y}, ${el.imageWidth}, ${el.imageHeight}, ${name});\n\n`;
+            code += `  ${drv}.pushImage(${el.x}, ${el.y}, ${dims.w}, ${dims.h}, ${name});\n\n`;
         } else if (el.type === "icon") {
           const src = el.iconSrc || (el.iconFile ? ("icons/" + el.iconFile) : "");
           code += `  // Icon asset (not embedded): ${src}\n`;
@@ -3404,6 +5374,74 @@ function generateTFTCode() {
         code += `  ${drv}.drawLine(${el.x}, ${el.y}, ${el.x + el.w}, ${el.y + el.h}, ${stroke565});\n`;
       } else if (el.type === "divider") {
         code += `  ${drv}.drawLine(${el.x}, ${el.y}, ${el.x + el.w}, ${el.y}, ${stroke565});\n`;
+      } else if (el.type === "path") {
+        if (Array.isArray(el.points) && el.points.length >= 2) {
+          for (let i = 0; i < el.points.length - 1; i++) {
+            const p0 = el.points[i];
+            const p1 = el.points[i + 1];
+            code += `  ${drv}.drawLine(${Math.round(p0.x)}, ${Math.round(p0.y)}, ${Math.round(p1.x)}, ${Math.round(p1.y)}, ${stroke565});\n`;
+          }
+          if (el.closed) {
+            const p0 = el.points[0];
+            const p1 = el.points[el.points.length - 1];
+            code += `  ${drv}.drawLine(${Math.round(p1.x)}, ${Math.round(p1.y)}, ${Math.round(p0.x)}, ${Math.round(p0.y)}, ${stroke565});\n`;
+          }
+          code += "\n";
+        }
+      } else if (el.type === "triangle") {
+        // Triangle (outline only; filled triangles require scanline fill).
+        const x1 = el.x + Math.floor(el.w / 2);
+        const y1 = el.y;
+        const x2 = el.x + el.w;
+        const y2 = el.y + el.h;
+        const x3 = el.x;
+        const y3 = el.y + el.h;
+        code += `  ${drv}.drawLine(${x1}, ${y1}, ${x2}, ${y2}, ${stroke565});\n`;
+        code += `  ${drv}.drawLine(${x2}, ${y2}, ${x3}, ${y3}, ${stroke565});\n`;
+        code += `  ${drv}.drawLine(${x3}, ${y3}, ${x1}, ${y1}, ${stroke565});\n\n`;
+      } else if (el.type === "polygon") {
+        const sides = Math.max(3, Math.min(32, parseInt(el.sides || 6, 10) || 6));
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h / 2;
+        const rx = el.w / 2;
+        const ry = el.h / 2;
+        const rot = (Number(el.rotation) || 0) * Math.PI / 180;
+        let px0 = null, py0 = null, pxPrev = null, pyPrev = null;
+        for (let i = 0; i < sides; i++) {
+          const a = rot + (i * Math.PI * 2) / sides - Math.PI / 2;
+          const px = Math.round(cx + Math.cos(a) * rx);
+          const py = Math.round(cy + Math.sin(a) * ry);
+          if (i === 0) { px0 = px; py0 = py; }
+          if (pxPrev != null) code += `  ${drv}.drawLine(${pxPrev}, ${pyPrev}, ${px}, ${py}, ${stroke565});\n`;
+          pxPrev = px; pyPrev = py;
+        }
+        if (px0 != null) code += `  ${drv}.drawLine(${pxPrev}, ${pyPrev}, ${px0}, ${py0}, ${stroke565});\n\n`;
+      } else if (el.type === "arc" || el.type === "gauge") {
+        // Arc/gauge approximation using line segments.
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h;
+        const r = Math.min(el.w, el.h * 2) / 2;
+        const start = (Number(el.startAngle) || -90) * Math.PI / 180;
+        const end = (Number(el.endAngle) || 90) * Math.PI / 180;
+        const steps = 28;
+        let pxPrev = null, pyPrev = null;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const a = start + (end - start) * t;
+          const px = Math.round(cx + Math.cos(a) * r);
+          const py = Math.round(cy + Math.sin(a) * r);
+          if (pxPrev != null) code += `  ${drv}.drawLine(${pxPrev}, ${pyPrev}, ${px}, ${py}, ${stroke565});\n`;
+          pxPrev = px; pyPrev = py;
+        }
+        if (el.type === "gauge") {
+          const v = Math.max(Number(el.minValue || 0), Math.min(Number(el.maxValue || 100), Number(el.value || 0)));
+          const tt = (v - Number(el.minValue || 0)) / Math.max(1, (Number(el.maxValue || 100) - Number(el.minValue || 0)));
+          const a = start + (end - start) * tt;
+          const nx = Math.round(cx + Math.cos(a) * (r - 2));
+          const ny = Math.round(cy + Math.sin(a) * (r - 2));
+          code += `  ${drv}.drawLine(${Math.round(cx)}, ${Math.round(cy)}, ${nx}, ${ny}, ${stroke565});\n`;
+        }
+        code += "\n";
       } else if (el.type === "label") {
         const txt = (el.text || "").replace(/"/g, '\\"');
         code += `  ${drv}.setTextColor(${text565});\n`;
@@ -3450,8 +5488,8 @@ function generateTFTCode() {
         const on = val >= 50;
         code += `  ${drv}.fillRoundRect(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r}, ${on ? fill565 : hexToRgb565("#111827")});\n`;
         code += `  ${drv}.drawRoundRect(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r}, ${stroke565});\n`;
-        const knobX = on ? el.x + el.w - r : el.x;
-        code += `  ${drv}.fillCircle(${knobX}, ${centerY}, ${r - 2}, ${on ? stroke565 : fill565});\n\n`;
+        const knobCx = on ? (el.x + el.w - r) : (el.x + r);
+        code += `  ${drv}.fillCircle(${knobCx}, ${centerY}, ${r - 2}, ${on ? stroke565 : fill565});\n\n`;
       } else if (el.type === "header") {
         const txt = (el.text || "Header").replace(/"/g, '\\"');
         code += `  ${drv}.fillRect(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${fill565});\n`;
@@ -3471,10 +5509,11 @@ function generateTFTCode() {
       }
 
       
+      // Navigation stub: keep metadata in the code for wiring your own input handler.
       if (el.actionType === "goto" && el.actionTargetScreenId) {
-        const targetScreen = screens.find(s => s.id === el.actionTargetScreenId);
-        if (targetScreen) {
-          const targetFnName = getScreenFnName(targetScreen);
+        const targetIdx = screenIndex.get(el.actionTargetScreenId);
+        if (targetIdx != null) {
+          code += `  // Action: goto screen DK_SCREEN_${targetIdx} (trigger from your input handler)\n`;
         }
       }
     });
@@ -3486,11 +5525,44 @@ function generateTFTCode() {
     code += "}\n\n";
   });
 
-  
-  const defaultScreen =
-    screens.find((s) => s.id === activeScreenId) || screens[0];
+  // Dispatch helper
+  code += "void drawCurrentScreen() {\n";
+  code += "  switch (g_screen) {\n";
+  screens.forEach((scr, i) => {
+    code += `    case DK_SCREEN_${i}: ${getScreenFnName(scr)}(); break;\n`;
+  });
+  code += "  }\n";
+  code += "}\n\n";
+
+  code += "// TODO: Read touch/buttons and set `g_screen` (and element values).\n";
+  code += "void handleUiActions() {\n";
+  code += "  // COMPLETE default behavior: screen switching via Serial.\n";
+  code += "  // Type a screen number (0..N-1) in Serial Monitor and press Enter.\n";
+  code += "  static int num = -1;\n";
+  code += "  while (Serial.available()) {\n";
+  code += "    const int c = Serial.read();\n";
+  code += "    if (c >= '0' && c <= '9') {\n";
+  code += "      if (num < 0) num = 0;\n";
+  code += "      num = (num * 10) + (c - '0');\n";
+  code += "    } else if (c == '\\n' || c == '\\r') {\n";
+  code += "      if (num >= 0) {\n";
+  code += `        const int maxScreen = ${Math.max(0, screens.length - 1)};\n`;
+  code += "        if (num < 0) num = 0;\n";
+  code += "        if (num > maxScreen) num = maxScreen;\n";
+  code += "        const DkScreenId next = (DkScreenId)num;\n";
+  code += "        if (next != g_screen) { g_screen = next; g_dirty = true; }\n";
+  code += "      }\n";
+  code += "      num = -1;\n";
+  code += "    }\n";
+  code += "  }\n";
+  code += "\n";
+  code += "  // Optional: auto-cycle every 5 seconds (uncomment to enable)\n";
+  code += "  // static uint32_t last = 0;\n";
+  code += "  // if (millis() - last > 5000) { last = millis(); g_screen = (DkScreenId)((g_screen + 1) % " + screens.length + "); g_dirty = true; }\n";
+  code += "}\n\n";
 
   code += "void setup() {\n";
+  code += "  Serial.begin(115200);\n";
   code += "  tft.init();\n";
 
   // Add TFT rotation setting
@@ -3498,15 +5570,20 @@ function generateTFTCode() {
 
   code += "  tft.setTextDatum(TL_DATUM);\n";
   code += "  tft.setTextFont(1);\n";
-  if (useSprite) {
-    code += `  spr.createSprite(${dispWidth}, ${dispHeight});\n`;
-  }
-  if (defaultScreen) {
-    const fnName = getScreenFnName(defaultScreen);
-    code += `  ${fnName}();\n`;
-  }
+  if (useSprite) code += `  spr.createSprite(${dispWidth}, ${dispHeight});\n`;
+  code += "  drawCurrentScreen();\n";
+  code += "  g_dirty = false;\n";
+  code += "  g_lastDrawMs = millis();\n";
   code += "}\n\n";
   code += "void loop() {\n";
+  code += "  handleUiActions();\n";
+  code += "  // Redraw only when needed (more \"pro\" and faster)\n";
+  code += "  if (g_dirty || (millis() - g_lastDrawMs) > 1000) {\n";
+  code += "    drawCurrentScreen();\n";
+  code += "    g_dirty = false;\n";
+  code += "    g_lastDrawMs = millis();\n";
+  code += "  }\n";
+  code += "  delay(5);\n";
   code += "}\n\n";
 
   codeOutput.value = code;
@@ -3516,6 +5593,11 @@ function generateU8g2Code() {
   let code = "";
   code += "#include <U8g2lib.h>\n";
   code += "#include <Wire.h>\n\n";
+  code += "// --- Generated by DisplayKit ---\n";
+  code += "// Notes:\n";
+  code += "// - This is a COMPLETE sketch skeleton (setup/loop + screen functions).\n";
+  code += "// - Button/touch interaction is not wired automatically; see `handleUiActions()`.\n";
+  code += "// - Element rotation is a preview-only feature; U8g2 primitives are not rotated.\n\n";
 
   const preset = U8G2_PRESETS.find(p => p.id === u8g2PresetId) || U8G2_PRESETS[0];
   if (preset.id === "custom") {
@@ -3524,25 +5606,30 @@ function generateU8g2Code() {
     code += preset.ctor + "\n\n";
   }
 
+  // Screen IDs -> indices for basic navigation stubs.
+  const screenIndex = new Map();
+  screens.forEach((s, i) => screenIndex.set(s.id, i));
+  const defaultScreen = screens.find((s) => s.id === activeScreenId) || screens[0];
+  const defaultIndex = defaultScreen ? (screenIndex.get(defaultScreen.id) ?? 0) : 0;
+  code += `enum DkScreenId { ${screens.map((s, i) => `DK_SCREEN_${i}`).join(", ")} };\n`;
+  code += `static DkScreenId g_screen = DK_SCREEN_${defaultIndex};\n`;
+  code += "static bool g_dirty = true;\n";
+  code += "static uint32_t g_lastDrawMs = 0;\n\n";
+
   // Monochrome bitmaps for icon elements (XBMP)
   const monoIcons = [];
   screens.forEach((scr) => {
     scr.elements.forEach((el) => {
-      if (
-        el.type === "icon" &&
-        Array.isArray(el.monoBitmap) &&
-        el.monoBitmap.length &&
-        el.imageWidth &&
-        el.imageHeight
-      ) {
-        monoIcons.push(el);
-      }
+      if (el.type !== "icon") return;
+      const bytes = getMonoBitmapForElement(el);
+      const dims = getImageDimsForElement(el);
+      if (bytes && bytes.length && dims && dims.w && dims.h) monoIcons.push(el);
     });
   });
 
   monoIcons.forEach((el) => {
     const name = (el.imageName || "icon_" + el.id.replace(/[^a-zA-Z0-9_]/g, "_")) + "_xbm";
-    const bytes = el.monoBitmap;
+    const bytes = getMonoBitmapForElement(el) || [];
     code += `const unsigned char ${name}[${bytes.length}] PROGMEM = {\n`;
     for (let i = 0; i < bytes.length; i++) {
       const v = bytes[i] & 0xff;
@@ -3556,61 +5643,13 @@ function generateU8g2Code() {
     code += "};\n\n";
   });
 
-  // Add OLED settings initialization
-  code += "void setup() {\n";
-  code += "  // Initialize OLED display\n";
-  code += "  u8g2.begin();\n";
-
-  // Add rotation setting
-  if (oledSettingsState.rotation !== 0) {
-    const rotationCommands = {
-      1: "u8g2.setDisplayRotation(U8G2_R1);",
-      2: "u8g2.setDisplayRotation(U8G2_R2);",
-      3: "u8g2.setDisplayRotation(U8G2_R3);"
-    };
-    if (rotationCommands[oledSettingsState.rotation]) {
-      code += `  ${rotationCommands[oledSettingsState.rotation]}\n`;
-    }
-  }
-
-  // Add contrast setting
-  if (oledSettingsState.contrast !== 127) {
-    code += `  u8g2.setContrast(${oledSettingsState.contrast});\n`;
-  }
-
-  // Add flip mode
-  if (oledSettingsState.flipMode !== "none") {
-    const flipCommands = {
-      "horizontal": "u8g2.setFlipMode(1);",
-      "vertical": "u8g2.setFlipMode(1);", // U8g2 doesn't have separate horizontal/vertical, just flip
-      "both": "u8g2.setFlipMode(1);"
-    };
-    if (flipCommands[oledSettingsState.flipMode]) {
-      code += `  ${flipCommands[oledSettingsState.flipMode]}\n`;
-    }
-  }
-
-  // Add font mode
-  if (oledSettingsState.fontMode === "solid") {
-    code += "  u8g2.setFontMode(1);\n"; // Solid background
-  } else {
-    code += "  u8g2.setFontMode(0);\n"; // Transparent background
-  }
-
-  // Add power save mode
-  if (oledSettingsState.powerSave === "auto") {
-    code += "  u8g2.setPowerSave(1);\n"; // Enable power save initially
-  }
-
-  code += "}\n\n";
-
-  
-  screens.forEach(scr => {
+  screens.forEach((scr) => {
     const fnName = getScreenFnName(scr);
     code += `void ${fnName}() {\n`;
     code += "  u8g2.clearBuffer();\n";
+    code += "  u8g2.setFontPosTop();\n";
 
-    scr.elements.forEach(el => {
+    scr.elements.forEach((el) => {
       const val = Math.max(0, Math.min(100, el.value != null ? el.value : 50));
       const font = el.font || DEFAULT_U8G2_FONT;
       const txtEsc = (el.text || "").replace(/"/g, '\\"');
@@ -3620,9 +5659,11 @@ function generateU8g2Code() {
         return;
       }
       if (el.type === "icon") {
-        if (Array.isArray(el.monoBitmap) && el.monoBitmap.length && el.imageWidth && el.imageHeight) {
+        const bytes = getMonoBitmapForElement(el);
+        const dims = getImageDimsForElement(el);
+        if (bytes && bytes.length && dims && dims.w && dims.h) {
           const name = (el.imageName || "icon_" + el.id.replace(/[^a-zA-Z0-9_]/g, "_")) + "_xbm";
-          code += `  u8g2.drawXBMP(${el.x}, ${el.y}, ${el.imageWidth}, ${el.imageHeight}, ${name});\n`;
+          code += `  u8g2.drawXBMP(${el.x}, ${el.y}, ${dims.w}, ${dims.h}, ${name});\n`;
         } else {
           const src = el.iconSrc || (el.iconFile ? ("icons/" + el.iconFile) : "");
           code += `  // Icon asset (not embedded): ${src}\n`;
@@ -3656,9 +5697,75 @@ function generateU8g2Code() {
         code += `  u8g2.drawLine(${el.x}, ${el.y}, ${el.x + el.w}, ${el.y + el.h});\n`;
       } else if (el.type === "divider") {
         code += `  u8g2.drawLine(${el.x}, ${el.y}, ${el.x + el.w}, ${el.y});\n`;
+      } else if (el.type === "path") {
+        if (Array.isArray(el.points) && el.points.length >= 2) {
+          for (let i = 0; i < el.points.length - 1; i++) {
+            const p0 = el.points[i];
+            const p1 = el.points[i + 1];
+            code += `  u8g2.drawLine(${Math.round(p0.x)}, ${Math.round(p0.y)}, ${Math.round(p1.x)}, ${Math.round(p1.y)});\n`;
+          }
+          if (el.closed) {
+            const p0 = el.points[0];
+            const p1 = el.points[el.points.length - 1];
+            code += `  u8g2.drawLine(${Math.round(p1.x)}, ${Math.round(p1.y)}, ${Math.round(p0.x)}, ${Math.round(p0.y)});\n`;
+          }
+          code += "\n";
+        }
+      } else if (el.type === "triangle") {
+        const x1 = el.x + Math.floor(el.w / 2);
+        const y1 = el.y;
+        const x2 = el.x + el.w;
+        const y2 = el.y + el.h;
+        const x3 = el.x;
+        const y3 = el.y + el.h;
+        code += `  u8g2.drawLine(${x1}, ${y1}, ${x2}, ${y2});\n`;
+        code += `  u8g2.drawLine(${x2}, ${y2}, ${x3}, ${y3});\n`;
+        code += `  u8g2.drawLine(${x3}, ${y3}, ${x1}, ${y1});\n\n`;
+      } else if (el.type === "polygon") {
+        const sides = Math.max(3, Math.min(32, parseInt(el.sides || 6, 10) || 6));
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h / 2;
+        const rx = el.w / 2;
+        const ry = el.h / 2;
+        const rot = (Number(el.rotation) || 0) * Math.PI / 180;
+        let px0 = null, py0 = null, pxPrev = null, pyPrev = null;
+        for (let i = 0; i < sides; i++) {
+          const a = rot + (i * Math.PI * 2) / sides - Math.PI / 2;
+          const px = Math.round(cx + Math.cos(a) * rx);
+          const py = Math.round(cy + Math.sin(a) * ry);
+          if (i === 0) { px0 = px; py0 = py; }
+          if (pxPrev != null) code += `  u8g2.drawLine(${pxPrev}, ${pyPrev}, ${px}, ${py});\n`;
+          pxPrev = px; pyPrev = py;
+        }
+        if (px0 != null) code += `  u8g2.drawLine(${pxPrev}, ${pyPrev}, ${px0}, ${py0});\n\n`;
+      } else if (el.type === "arc" || el.type === "gauge") {
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h;
+        const r = Math.min(el.w, el.h * 2) / 2;
+        const start = (Number(el.startAngle) || -90) * Math.PI / 180;
+        const end = (Number(el.endAngle) || 90) * Math.PI / 180;
+        const steps = 28;
+        let pxPrev = null, pyPrev = null;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const a = start + (end - start) * t;
+          const px = Math.round(cx + Math.cos(a) * r);
+          const py = Math.round(cy + Math.sin(a) * r);
+          if (pxPrev != null) code += `  u8g2.drawLine(${pxPrev}, ${pyPrev}, ${px}, ${py});\n`;
+          pxPrev = px; pyPrev = py;
+        }
+        if (el.type === "gauge") {
+          const v = Math.max(Number(el.minValue || 0), Math.min(Number(el.maxValue || 100), Number(el.value || 0)));
+          const tt = (v - Number(el.minValue || 0)) / Math.max(1, (Number(el.maxValue || 100) - Number(el.minValue || 0)));
+          const a = start + (end - start) * tt;
+          const nx = Math.round(cx + Math.cos(a) * (r - 2));
+          const ny = Math.round(cy + Math.sin(a) * (r - 2));
+          code += `  u8g2.drawLine(${Math.round(cx)}, ${Math.round(cy)}, ${nx}, ${ny});\n`;
+        }
+        code += "\n";
       } else if (el.type === "label") {
         code += `  u8g2.setFont(${font});\n`;
-        code += `  u8g2.drawUTF8(${el.x}, ${el.y} + 10, "${txtEsc}");\n\n`;
+        code += `  u8g2.drawUTF8(${el.x}, ${el.y}, "${txtEsc}");\n\n`;
       } else if (el.type === "text") {
         const lines = String(el.text || "Text").split(/\r?\n/);
         code += `  u8g2.setFont(${font});\n`;
@@ -3666,7 +5773,7 @@ function generateU8g2Code() {
         const lh = 12;
         lines.forEach((line, idx) => {
           const esc = String(line).replace(/"/g, '\\"');
-          code += `  u8g2.drawUTF8(${el.x}, ${el.y} + 10 + ${idx} * ${lh}, "${esc}");\n`;
+          code += `  u8g2.drawUTF8(${el.x}, ${el.y} + ${idx} * ${lh}, "${esc}");\n`;
         });
         code += "\n";
       } else if (el.type === "button") {
@@ -3705,8 +5812,8 @@ function generateU8g2Code() {
         const centerY = el.y + r;
         const on = val >= 50;
         code += `  u8g2.drawRFrame(${el.x}, ${el.y}, ${el.w}, ${el.h}, ${r});\n`;
-        const knobX = on ? el.x + el.w - r : el.x;
-        code += `  u8g2.drawDisc(${knobX}, ${centerY}, ${r - 2});\n\n`;
+        const knobCx = on ? (el.x + el.w - r) : (el.x + r);
+        code += `  u8g2.drawDisc(${knobCx}, ${centerY}, ${r - 2});\n\n`;
       } else if (el.type === "header") {
         if (el.oledFill !== false) {
           code += `  u8g2.drawBox(${el.x}, ${el.y}, ${el.w}, ${el.h});\n`;
@@ -3735,10 +5842,9 @@ function generateU8g2Code() {
 
       
       if (el.actionType === "goto" && el.actionTargetScreenId) {
-        const targetScreen = screens.find(s => s.id === el.actionTargetScreenId);
-        if (targetScreen) {
-          const targetFnName = getScreenFnName(targetScreen);
-          // navigation wiring left for user to implement
+        const targetIdx = screenIndex.get(el.actionTargetScreenId);
+        if (targetIdx != null) {
+          code += `  // Action: goto screen DK_SCREEN_${targetIdx} (trigger from your input handler)\n`;
         }
       }
     });
@@ -3747,17 +5853,88 @@ function generateU8g2Code() {
     code += "}\n\n";
   });
 
-  const defaultScreen =
-    screens.find((s) => s.id === activeScreenId) || screens[0];
+  code += "void drawCurrentScreen() {\n";
+  code += "  switch (g_screen) {\n";
+  screens.forEach((scr, i) => {
+    code += `    case DK_SCREEN_${i}: ${getScreenFnName(scr)}(); break;\n`;
+  });
+  code += "  }\n";
+  code += "}\n\n";
+
+  code += "// TODO: Read buttons/touch and set `g_screen` (and element values).\n";
+  code += "void handleUiActions() {\n";
+  code += "  // COMPLETE default behavior: screen switching via Serial.\n";
+  code += "  // Type a screen number (0..N-1) in Serial Monitor and press Enter.\n";
+  code += "  static int num = -1;\n";
+  code += "  while (Serial.available()) {\n";
+  code += "    const int c = Serial.read();\n";
+  code += "    if (c >= '0' && c <= '9') {\n";
+  code += "      if (num < 0) num = 0;\n";
+  code += "      num = (num * 10) + (c - '0');\n";
+  code += "    } else if (c == '\\n' || c == '\\r') {\n";
+  code += "      if (num >= 0) {\n";
+  code += `        const int maxScreen = ${Math.max(0, screens.length - 1)};\n`;
+  code += "        if (num < 0) num = 0;\n";
+  code += "        if (num > maxScreen) num = maxScreen;\n";
+  code += "        const DkScreenId next = (DkScreenId)num;\n";
+  code += "        if (next != g_screen) { g_screen = next; g_dirty = true; }\n";
+  code += "      }\n";
+  code += "      num = -1;\n";
+  code += "    }\n";
+  code += "  }\n";
+  code += "\n";
+  code += "  // Optional: auto-cycle every 5 seconds (uncomment to enable)\n";
+  code += "  // static uint32_t last = 0;\n";
+  code += "  // if (millis() - last > 5000) { last = millis(); g_screen = (DkScreenId)((g_screen + 1) % " + screens.length + "); g_dirty = true; }\n";
+  code += "}\n\n";
 
   code += "void setup() {\n";
+  code += "  Serial.begin(115200);\n";
   code += "  u8g2.begin();\n";
-  if (defaultScreen) {
-    const fnName = getScreenFnName(defaultScreen);
-    code += `  ${fnName}();\n`;
+
+  // Rotation
+  if (oledSettingsState.rotation !== 0) {
+    const rotationCommands = {
+      1: "u8g2.setDisplayRotation(U8G2_R1);",
+      2: "u8g2.setDisplayRotation(U8G2_R2);",
+      3: "u8g2.setDisplayRotation(U8G2_R3);"
+    };
+    if (rotationCommands[oledSettingsState.rotation]) {
+      code += `  ${rotationCommands[oledSettingsState.rotation]}\n`;
+    }
   }
+  // Contrast
+  if (oledSettingsState.contrast !== 127) {
+    code += `  u8g2.setContrast(${oledSettingsState.contrast});\n`;
+  }
+  // Flip
+  if (oledSettingsState.flipMode !== "none") {
+    code += "  u8g2.setFlipMode(1);\n";
+  }
+  // Font mode
+  code += oledSettingsState.fontMode === "solid"
+    ? "  u8g2.setFontMode(1);\n"
+    : "  u8g2.setFontMode(0);\n";
+  // Power save
+  if (oledSettingsState.powerSave === "auto") {
+    code += "  u8g2.setPowerSave(1);\n";
+  } else {
+    code += "  u8g2.setPowerSave(0);\n";
+  }
+
+  code += "  drawCurrentScreen();\n";
+  code += "  g_dirty = false;\n";
+  code += "  g_lastDrawMs = millis();\n";
   code += "}\n\n";
   code += "void loop() {\n";
+  code += "  handleUiActions();\n";
+  code += "  // Redraw only when needed (more \"pro\" and faster)\n";
+  code += "  if (g_dirty || (millis() - g_lastDrawMs) > 1000) {\n";
+  code += "    drawCurrentScreen();\n";
+  code += "    g_dirty = false;\n";
+  code += "    g_lastDrawMs = millis();\n";
+  code += "  }\n";
+  code += "  delay(5);\n";
   code += "}\n";
 
   codeOutput.value = code;
@@ -3765,8 +5942,51 @@ function generateU8g2Code() {
 
 
 applyResBtn.addEventListener("click", () => {
+  const prevW = dispWidth;
+  const prevH = dispHeight;
   dispWidth = parseInt(dispWidthInput.value, 10) || 240;
   dispHeight = parseInt(dispHeightInput.value, 10) || 320;
+
+  // Apply constraints (Figma-ish) when the artboard size changes.
+  if (prevW !== dispWidth || prevH !== dispHeight) {
+    elements.forEach((el) => {
+      if (!el || el.hidden) return;
+      const c = el.constraints || {};
+      const left = el.x;
+      const top = el.y;
+      const right = prevW - (el.x + el.w);
+      const bottom = prevH - (el.y + el.h);
+
+      const keepL = !!c.left;
+      const keepR = !!c.right;
+      const keepT = !!c.top;
+      const keepB = !!c.bottom;
+
+      if (keepL && keepR) {
+        el.x = Math.round(left);
+        el.w = Math.max(10, Math.round(dispWidth - left - right));
+      } else if (keepR && !keepL) {
+        el.x = Math.round(dispWidth - right - el.w);
+      } else {
+        el.x = Math.round(left);
+      }
+
+      if (keepT && keepB) {
+        el.y = Math.round(top);
+        el.h = Math.max(10, Math.round(dispHeight - top - bottom));
+      } else if (keepB && !keepT) {
+        el.y = Math.round(dispHeight - bottom - el.h);
+      } else {
+        el.y = Math.round(top);
+      }
+
+      // Clamp into bounds
+      el.x = Math.max(0, Math.min(dispWidth - el.w, el.x));
+      el.y = Math.max(0, Math.min(dispHeight - el.h, el.y));
+    });
+    syncActiveScreenElements();
+    renderLayers();
+  }
   updatePreviewSize();
   renderElements();
   updateCode();
@@ -3995,6 +6215,22 @@ imageInput.addEventListener("change", (e) => {
         rgb565[p] = val;
       }
 
+      // Register asset (respect Assets panel "Embed" toggle if present; default = embed)
+      const embed = assetsEmbedToggle ? !!assetsEmbedToggle.checked : true;
+      const assetId = "asset_" + Math.random().toString(36).slice(2, 10);
+      assets.push({
+        id: assetId,
+        name: normalizeIconNameFromFile(file) || file.name,
+        kind: "image",
+        dataUrl: embed ? reader.result : null,
+        sourceName: file.name,
+        width: w,
+        height: h,
+        rgb565: Array.from(rgb565),
+      });
+      ensureAssetsDefaults();
+      renderAssets();
+
       const id = makeId();
       const el = {
         id,
@@ -4014,6 +6250,7 @@ imageInput.addEventListener("change", (e) => {
         imageHeight: h,
         rgb565,
         previewUrl: reader.result,
+        assetId,
         font: getCurrentDriverMode() === "tft" ? DEFAULT_TFT_FONT : DEFAULT_U8G2_FONT
       };
 
@@ -4024,6 +6261,7 @@ imageInput.addEventListener("change", (e) => {
       renderElements();
       updatePropsInputs();
       updateCode();
+      renderAssets();
       pushHistory();
     };
     img.src = reader.result;
@@ -4110,6 +6348,20 @@ function addElement(type) {
   } else if (type === "circle") {
     baseW = 40;
     baseH = 40;
+  } else if (type === "triangle") {
+    baseW = 44;
+    baseH = 40;
+  } else if (type === "polygon") {
+    baseW = 46;
+    baseH = 46;
+  } else if (type === "arc") {
+    baseW = 70;
+    baseH = 40;
+    value = 75;
+  } else if (type === "gauge") {
+    baseW = 70;
+    baseH = 40;
+    value = 65;
   }
 
   // Smart positioning - place new elements in a grid pattern or near existing elements
@@ -4166,7 +6418,15 @@ function addElement(type) {
     value,
     actionType: "",
     actionTargetScreenId: null,
-    font: getCurrentDriverMode() === "tft" ? DEFAULT_TFT_FONT : DEFAULT_U8G2_FONT
+    font: getCurrentDriverMode() === "tft" ? DEFAULT_TFT_FONT : DEFAULT_U8G2_FONT,
+    rotation: 0,
+    // Advanced shape defaults (used by new tools)
+    sides: type === "polygon" ? 6 : undefined,
+    startAngle: (type === "arc" || type === "gauge") ? -90 : undefined,
+    endAngle: (type === "arc" || type === "gauge") ? 90 : undefined,
+    thickness: type === "gauge" ? 4 : undefined,
+    minValue: type === "gauge" ? 0 : undefined,
+    maxValue: type === "gauge" ? 100 : undefined
   };
 
   elements.push(el);
@@ -4209,6 +6469,7 @@ function bindNumeric(input, key) {
     }
     el[key] = v;
     renderElements();
+    renderLayers();
     updateCode();
     pushHistory();
 
@@ -4219,20 +6480,122 @@ function bindNumeric(input, key) {
   });
 }
 
+/** Drag numeric labels horizontally to scrub values (Figma-like). */
+function bindScrubLabel(labelEl, inputEl, opts) {
+  const isRotation = !!(opts && opts.isRotation);
+  if (!labelEl || !inputEl) return;
+  labelEl.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const base = isRotation ? (parseFloat(inputEl.value) || 0) : (parseInt(inputEl.value, 10) || 0);
+    function onMove(ev) {
+      const dx = ev.clientX - startX;
+      const scale = ev.shiftKey ? 2 : ev.altKey ? 0.25 : 1;
+      const next = isRotation
+        ? Math.round(base + dx * 0.35 * scale)
+        : Math.round(base + dx * 0.12 * scale);
+      inputEl.value = String(next);
+      inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+}
+
 bindNumeric(propX, "x");
 bindNumeric(propY, "y");
 bindNumeric(propW, "w");
 bindNumeric(propH, "h");
 bindNumeric(propTextSize, "textSize");
 
+if (propRotate) {
+  propRotate.addEventListener("input", () => {
+    const el = elements.find((e) => e.id === selectedId);
+    if (!el || el.type === "line") return;
+    let v = parseFloat(propRotate.value);
+    if (isNaN(v)) v = 0;
+    el.rotation = Math.round(v);
+    renderElements();
+    renderLayers();
+    updateCode();
+    pushHistory();
+  });
+}
+
+bindScrubLabel(document.querySelector('label[for="propX"]'), propX, {});
+bindScrubLabel(document.querySelector('label[for="propY"]'), propY, {});
+bindScrubLabel(document.querySelector('label[for="propW"]'), propW, {});
+bindScrubLabel(document.querySelector('label[for="propH"]'), propH, {});
+if (propRotate) bindScrubLabel(document.querySelector('label[for="propRotate"]'), propRotate, { isRotation: true });
+
 propText.addEventListener("input", () => {
   const el = elements.find((el) => el.id === selectedId);
   if (!el) return;
   el.text = propText.value;
+  if (el.textAutoSize) {
+    // Rough auto-size for preview: keep width, adjust height by line count + line height
+    const lines = String(el.text || "").split(/\r?\n/);
+    const lh = Math.max(6, parseInt(el.lineHeight || 12, 10) || 12);
+    el.h = Math.max(10, lines.length * lh);
+  }
   renderElements();
   updateCode();
   pushHistory();
 });
+
+if (propLineHeight) {
+  propLineHeight.addEventListener("input", () => {
+    const el = elements.find((el) => el.id === selectedId);
+    if (!el) return;
+    let v = parseInt(propLineHeight.value, 10);
+    if (isNaN(v)) v = 12;
+    el.lineHeight = Math.max(6, Math.min(64, v));
+    if (el.textAutoSize) {
+      const lines = String(el.text || "").split(/\r?\n/);
+      el.h = Math.max(10, lines.length * el.lineHeight);
+    }
+    renderElements();
+    updateCode();
+    pushHistory();
+  });
+}
+if (propTextAutoSize) {
+  propTextAutoSize.addEventListener("change", () => {
+    const el = elements.find((el) => el.id === selectedId);
+    if (!el) return;
+    el.textAutoSize = !!propTextAutoSize.checked;
+    if (el.textAutoSize) {
+      const lines = String(el.text || "").split(/\r?\n/);
+      const lh = Math.max(6, parseInt(el.lineHeight || 12, 10) || 12);
+      el.h = Math.max(10, lines.length * lh);
+    }
+    renderElements();
+    updateCode();
+    pushHistory();
+  });
+}
+
+function setSelectedTextAlign(textAlign, vAlign) {
+  const el = elements.find((el) => el.id === selectedId);
+  if (!el || !elementHasText(el.type)) return;
+  if (textAlign) el.textAlign = textAlign;
+  if (vAlign) el.vAlign = vAlign;
+  renderElements();
+  updateCode();
+  pushHistory();
+}
+
+if (textAlignLeftBtn) textAlignLeftBtn.addEventListener("click", () => setSelectedTextAlign("left", null));
+if (textAlignCenterBtn) textAlignCenterBtn.addEventListener("click", () => setSelectedTextAlign("center", null));
+if (textAlignRightBtn) textAlignRightBtn.addEventListener("click", () => setSelectedTextAlign("right", null));
+if (vAlignTopBtn) vAlignTopBtn.addEventListener("click", () => setSelectedTextAlign(null, "top"));
+if (vAlignMiddleBtn) vAlignMiddleBtn.addEventListener("click", () => setSelectedTextAlign(null, "middle"));
+if (vAlignBottomBtn) vAlignBottomBtn.addEventListener("click", () => setSelectedTextAlign(null, "bottom"));
 
 propFillColor.addEventListener("input", () => {
   const el = elements.find((el) => el.id === selectedId);
@@ -4365,12 +6728,30 @@ if (propIconTintColor) {
   });
 }
 
+function updateSelectedConstraints() {
+  const el = elements.find((el) => el.id === selectedId);
+  if (!el) return;
+  el.constraints = el.constraints || {};
+  if (constraintLeft) el.constraints.left = !!constraintLeft.checked;
+  if (constraintRight) el.constraints.right = !!constraintRight.checked;
+  if (constraintTop) el.constraints.top = !!constraintTop.checked;
+  if (constraintBottom) el.constraints.bottom = !!constraintBottom.checked;
+  pushHistory();
+}
+
+if (constraintLeft) constraintLeft.addEventListener("change", updateSelectedConstraints);
+if (constraintRight) constraintRight.addEventListener("change", updateSelectedConstraints);
+if (constraintTop) constraintTop.addEventListener("change", updateSelectedConstraints);
+if (constraintBottom) constraintBottom.addEventListener("change", updateSelectedConstraints);
+
 deleteElementBtn.addEventListener("click", () => {
   elements = elements.filter((el) => el.id !== selectedId);
   const scr = screens.find((s) => s.id === activeScreenId);
   if (scr) scr.elements = elements;
   selectedId = null;
+  selectedIds = new Set();
   renderElements();
+  renderLayers();
   updatePropsInputs();
   updateCode();
   pushHistory();
@@ -4378,21 +6759,81 @@ deleteElementBtn.addEventListener("click", () => {
 
 
 preview.addEventListener("mousedown", (e) => {
-  if (e.target.classList.contains("ui-element")) {
-    // Clicked on an element - select it
-    const id = e.target.dataset.id;
-    selectElement(id, false);
-    pushHistory();
+  if (e.button !== 0) return;
+  const hit = "closest" in (e.target || {}) ? e.target.closest(".ui-element") : null;
+  if (!hit) return;
+  if (e.target && "closest" in e.target && e.target.closest(".resize-handle")) return;
+  const id = hit.dataset.id;
+  if (e.shiftKey) {
+    toggleSelectElement(id, false);
   } else {
-    // Clicked on empty space - deselect current element
-    if (selectedId) {
+    selectElement(id, false);
+  }
+  pushHistory();
+});
+
+document.addEventListener("mousedown", (e) => {
+  if (!contextMenu) return;
+  if (!contextMenu.classList.contains("open")) return;
+  if (e.target === contextMenu || contextMenu.contains(e.target)) return;
+  closeContextMenu();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeContextMenu();
+});
+
+if (contextMenu) {
+  contextMenu.addEventListener("click", (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest("[data-action]") : null;
+    const action = btn ? btn.getAttribute("data-action") : null;
+    if (!action) return;
+    const sels = getSelectedElements();
+    if (!sels.length) return;
+
+    if (action === "duplicate") {
+      duplicateBtn.click();
+    } else if (action === "delete") {
+      const ids = sels.map((s) => s.id);
+      elements = elements.filter((x) => !ids.includes(x.id));
+      syncActiveScreenElements();
       selectedId = null;
-      updatePropsInputs();
+      selectedIds = new Set();
       renderElements();
+      renderLayers();
+      updatePropsInputs();
+      updateCode();
+      pushHistory();
+    } else if (action === "group") {
+      groupSelection();
+    } else if (action === "ungroup") {
+      ungroupSelection();
+    } else if (action === "front") {
+      sels.forEach((s) => bringToFront(s.id));
+    } else if (action === "back") {
+      sels.slice().reverse().forEach((s) => sendToBack(s.id));
+    } else if (action === "lock") {
+      const next = !sels.every((s) => !!s.locked);
+      sels.forEach((s) => (s.locked = next));
+      renderLayers();
+      pushHistory();
+    } else if (action === "hide") {
+      const next = !sels.every((s) => !!s.hidden);
+      sels.forEach((s) => (s.hidden = next));
+      if (next) {
+        sels.forEach((s) => selectedIds.delete(s.id));
+        selectedId = selectedIds.size ? Array.from(selectedIds)[selectedIds.size - 1] : null;
+      }
+      renderElements();
+      renderLayers();
+      updatePropsInputs(false);
+      updateCode();
       pushHistory();
     }
-  }
-});
+
+    closeContextMenu();
+  });
+}
 
 
 copyCodeBtn.addEventListener("click", async () => {
@@ -4443,6 +6884,7 @@ duplicateBtn.addEventListener("click", () => {
   elements.push(copy);
   syncActiveScreenElements();
   selectedId = id;
+  selectedIds = new Set([id]);
 
   // Add visual feedback for duplication
   setTimeout(() => {
@@ -4456,6 +6898,7 @@ duplicateBtn.addEventListener("click", () => {
   }, 50);
 
   renderElements();
+  renderLayers();
   updatePropsInputs();
   updateCode();
   pushHistory();
@@ -4463,10 +6906,46 @@ duplicateBtn.addEventListener("click", () => {
 
 
 zoomSlider.addEventListener("input", () => {
-  zoomFactor = parseInt(zoomSlider.value, 10) / 100;
+  setZoom(parseInt(zoomSlider.value, 10) / 100);
   updatePreviewSize();
   renderElements();
+  renderLayers();
 });
+
+if (zoomInput) {
+  zoomInput.addEventListener("change", () => {
+    const v = parseFloat(zoomInput.value);
+    if (!Number.isFinite(v)) return;
+    setZoom(v / 100);
+    updatePreviewSize();
+    renderElements();
+    renderLayers();
+  });
+}
+if (zoomResetBtn) {
+  zoomResetBtn.addEventListener("click", () => {
+    viewportPanX = 0;
+    viewportPanY = 0;
+    setZoom(0.75);
+    updatePreviewSize();
+    renderElements();
+    renderLayers();
+  });
+}
+if (zoomFitBtn) {
+  zoomFitBtn.addEventListener("click", () => {
+    viewportPanX = 0;
+    viewportPanY = 0;
+    // Fit is already handled by baseScale in updatePreviewSize; here we reset zoom transform.
+    setZoom(1);
+    updatePreviewSize();
+    renderElements();
+    renderLayers();
+  });
+}
+if (zoomSelectionBtn) {
+  zoomSelectionBtn.addEventListener("click", () => zoomToSelection());
+}
 
 
 let resizeTimeout;
@@ -4520,30 +6999,47 @@ importJsonInput.addEventListener("change", (e) => {
 
 
 function alignSelected(mode) {
-  const el = elements.find(e => e.id === selectedId);
-  if (!el) return;
+  const ids = selectedIds && selectedIds.size ? Array.from(selectedIds) : (selectedId ? [selectedId] : []);
+  const els = ids.map((id) => elements.find((e) => e.id === id)).filter(Boolean);
+  if (!els.length) return;
 
-  if (mode === "left") {
-    el.x = 0;
-  } else if (mode === "right") {
-    el.x = dispWidth - el.w;
-  } else if (mode === "hcenter") {
-    el.x = Math.round((dispWidth - el.w) / 2);
-  } else if (mode === "top") {
-    el.y = 0;
-  } else if (mode === "bottom") {
-    el.y = dispHeight - el.h;
-  } else if (mode === "vcenter") {
-    el.y = Math.round((dispHeight - el.h) / 2);
+  if (els.length === 1) {
+    const el = els[0];
+    if (mode === "left") el.x = 0;
+    else if (mode === "right") el.x = dispWidth - el.w;
+    else if (mode === "hcenter") el.x = Math.round((dispWidth - el.w) / 2);
+    else if (mode === "top") el.y = 0;
+    else if (mode === "bottom") el.y = dispHeight - el.h;
+    else if (mode === "vcenter") el.y = Math.round((dispHeight - el.h) / 2);
+  } else {
+    // Multi-select: align within current selection bounds.
+    const minX = Math.min(...els.map((e) => e.x));
+    const minY = Math.min(...els.map((e) => e.y));
+    const maxX = Math.max(...els.map((e) => e.x + e.w));
+    const maxY = Math.max(...els.map((e) => e.y + e.h));
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+
+    els.forEach((el) => {
+      if (mode === "left") el.x = Math.round(minX);
+      else if (mode === "right") el.x = Math.round(maxX - el.w);
+      else if (mode === "hcenter") el.x = Math.round(midX - el.w / 2);
+      else if (mode === "top") el.y = Math.round(minY);
+      else if (mode === "bottom") el.y = Math.round(maxY - el.h);
+      else if (mode === "vcenter") el.y = Math.round(midY - el.h / 2);
+    });
   }
 
   if (snapToGrid && gridSize > 0) {
-    el.x = Math.round(el.x / gridSize) * gridSize;
-    el.y = Math.round(el.y / gridSize) * gridSize;
+    els.forEach((el) => {
+      el.x = Math.round(el.x / gridSize) * gridSize;
+      el.y = Math.round(el.y / gridSize) * gridSize;
+    });
   }
 
   updatePropsInputs(false);
   renderElements();
+  renderLayers();
   updateCode();
   pushHistory();
 }
@@ -4554,6 +7050,62 @@ alignHCenterBtn.addEventListener("click", () => alignSelected("hcenter"));
 alignTopBtn.addEventListener("click", () => alignSelected("top"));
 alignBottomBtn.addEventListener("click", () => alignSelected("bottom"));
 alignVCenterBtn.addEventListener("click", () => alignSelected("vcenter"));
+
+function distributeSelected(axis) {
+  const ids = selectedIds && selectedIds.size ? Array.from(selectedIds) : [];
+  const els = ids.map((id) => elements.find((e) => e.id === id)).filter(Boolean);
+  if (els.length < 3) return;
+
+  if (axis === "h") {
+    const sorted = els.slice().sort((a, b) => a.x - b.x);
+    const minX = sorted[0].x;
+    const maxX = sorted[sorted.length - 1].x + sorted[sorted.length - 1].w;
+    const totalW = sorted.reduce((s, e) => s + e.w, 0);
+    const gap = (maxX - minX - totalW) / (sorted.length - 1);
+    let cursor = minX;
+    sorted.forEach((el, idx) => {
+      if (idx === 0) {
+        cursor = el.x + el.w + gap;
+        return;
+      }
+      if (idx === sorted.length - 1) return; // keep last anchored
+      el.x = Math.round(cursor);
+      cursor = el.x + el.w + gap;
+    });
+  } else {
+    const sorted = els.slice().sort((a, b) => a.y - b.y);
+    const minY = sorted[0].y;
+    const maxY = sorted[sorted.length - 1].y + sorted[sorted.length - 1].h;
+    const totalH = sorted.reduce((s, e) => s + e.h, 0);
+    const gap = (maxY - minY - totalH) / (sorted.length - 1);
+    let cursor = minY;
+    sorted.forEach((el, idx) => {
+      if (idx === 0) {
+        cursor = el.y + el.h + gap;
+        return;
+      }
+      if (idx === sorted.length - 1) return; // keep last anchored
+      el.y = Math.round(cursor);
+      cursor = el.y + el.h + gap;
+    });
+  }
+
+  if (snapToGrid && gridSize > 0) {
+    els.forEach((el) => {
+      el.x = Math.round(el.x / gridSize) * gridSize;
+      el.y = Math.round(el.y / gridSize) * gridSize;
+    });
+  }
+
+  updatePropsInputs(false);
+  renderElements();
+  renderLayers();
+  updateCode();
+  pushHistory();
+}
+
+if (distributeHBtn) distributeHBtn.addEventListener("click", () => distributeSelected("h"));
+if (distributeVBtn) distributeVBtn.addEventListener("click", () => distributeSelected("v"));
 
 
 document.addEventListener("keydown", (e) => {
@@ -4591,9 +7143,12 @@ document.addEventListener("keydown", (e) => {
   // Select all elements (Ctrl+A) - selects first element
   if ((e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
-    if (!selectedId && elements.length > 0) {
-      selectElement(elements[0].id);
-    }
+    selectedIds = new Set(elements.map((el) => el.id));
+    selectedId = elements.length ? elements[elements.length - 1].id : null;
+    updatePropsInputs();
+    renderElements();
+    renderLayers();
+    pushHistory();
     return;
   }
 
@@ -4619,17 +7174,18 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  const el = elements.find((el) => el.id === selectedId);
-  if (!el) return;
-
   // Delete element
   if (e.key === "Delete" || e.key === "Backspace") {
     e.preventDefault();
-    elements = elements.filter((x) => x.id !== selectedId);
+    const ids = selectedIds && selectedIds.size ? Array.from(selectedIds) : (selectedId ? [selectedId] : []);
+    if (!ids.length) return;
+    elements = elements.filter((x) => !ids.includes(x.id));
     const scr = screens.find((s) => s.id === activeScreenId);
     if (scr) scr.elements = elements;
     selectedId = null;
+    selectedIds = new Set();
     renderElements();
+    renderLayers();
     updatePropsInputs();
     updateCode();
     pushHistory();
@@ -4639,20 +7195,27 @@ document.addEventListener("keydown", (e) => {
   // Element movement with arrow keys
   if (e.key.startsWith("Arrow")) {
     e.preventDefault();
-    const step = e.shiftKey ? (snapToGrid ? gridSize * 2 : 10) : (snapToGrid ? gridSize : 1);
+    const ids = selectedIds && selectedIds.size ? Array.from(selectedIds) : (selectedId ? [selectedId] : []);
+    const targets = ids.map((id) => elements.find((x) => x.id === id)).filter((x) => x && !x.hidden && !x.locked);
+    if (!targets.length) return;
 
-    if (e.key === "ArrowLeft") el.x = Math.max(0, el.x - step);
-    if (e.key === "ArrowRight") el.x = Math.min(dispWidth - el.w, el.x + step);
-    if (e.key === "ArrowUp") el.y = Math.max(0, el.y - step);
-    if (e.key === "ArrowDown") el.y = Math.min(dispHeight - el.h, el.y + step);
+    const baseStep = e.altKey ? 1 : (snapToGrid ? gridSize : 1);
+    const step = e.shiftKey ? (e.altKey ? 10 : (snapToGrid ? gridSize * 2 : 10)) : baseStep;
 
-    if (snapToGrid && gridSize > 0) {
-      el.x = Math.round(el.x / gridSize) * gridSize;
-      el.y = Math.round(el.y / gridSize) * gridSize;
-    }
+    targets.forEach((el) => {
+      if (e.key === "ArrowLeft") el.x = Math.max(0, el.x - step);
+      if (e.key === "ArrowRight") el.x = Math.min(dispWidth - el.w, el.x + step);
+      if (e.key === "ArrowUp") el.y = Math.max(0, el.y - step);
+      if (e.key === "ArrowDown") el.y = Math.min(dispHeight - el.h, el.y + step);
+      if (snapToGrid && gridSize > 0 && !e.altKey) {
+        el.x = Math.round(el.x / gridSize) * gridSize;
+        el.y = Math.round(el.y / gridSize) * gridSize;
+      }
+    });
 
     updatePropsInputs(false);
     renderElements();
+    renderLayers();
     updateCode();
     pushHistory();
     return;
@@ -4806,7 +7369,19 @@ if (uiExamplesNextBtn) {
   });
 }
 
-
+/** When the app is served by server/main.py, /api/health exists; set a flag for future API use. */
+(function probeDisplayKitApi() {
+  if (!window.fetch) return;
+  const url = new URL("/api/health", window.location.origin);
+  fetch(url, { method: "GET", credentials: "same-origin" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (data && data.status === "ok") {
+        document.documentElement.dataset.displaykitApi = "1";
+      }
+    })
+    .catch(() => {});
+})();
 
 
 

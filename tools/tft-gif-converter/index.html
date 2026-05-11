@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TFT GIF Converter (Web)</title>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: rgba(255,255,255,0.06);
+        --panel2: rgba(255,255,255,0.08);
+        --text: rgba(255,255,255,0.92);
+        --muted: rgba(255,255,255,0.7);
+        --border: rgba(255,255,255,0.12);
+        --accent: #ff6d1f;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: var(--sans);
+        background: radial-gradient(1200px 600px at 20% 0%, rgba(255,109,31,0.22), transparent 45%),
+                    radial-gradient(900px 500px at 80% 10%, rgba(0,212,255,0.10), transparent 55%),
+                    var(--bg);
+        color: var(--text);
+      }
+      .wrap {
+        display: grid;
+        grid-template-columns: 420px 1fr;
+        gap: 14px;
+        padding: 14px;
+        height: 100%;
+        box-sizing: border-box;
+      }
+      .card {
+        background: linear-gradient(180deg, var(--panel), rgba(0,0,0,0.06));
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        box-shadow: 0 18px 40px rgba(0,0,0,0.30);
+        overflow: hidden;
+      }
+      .title { font-weight: 900; letter-spacing: 0.01em; }
+      .hint { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.35; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+      input, select, button, textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(0,0,0,0.18);
+        color: var(--text);
+        padding: 10px 10px;
+        outline: none;
+      }
+      button {
+        cursor: pointer;
+        background: linear-gradient(180deg, rgba(255,109,31,0.92), rgba(255,109,31,0.75));
+        border-color: rgba(255,109,31,0.38);
+        font-weight: 900;
+        letter-spacing: 0.01em;
+      }
+      button.secondary {
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(255,255,255,0.14);
+        font-weight: 800;
+      }
+      textarea { min-height: 260px; font-family: var(--mono); font-size: 12px; }
+      .preview {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 10px;
+        height: 100%;
+      }
+      .preview-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.06);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .imgbox {
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        border: 1px dashed rgba(255,255,255,0.18);
+        background: rgba(0,0,0,0.14);
+        padding: 12px;
+      }
+      .imgbox img {
+        max-width: min(520px, 100%);
+        max-height: min(520px, 100%);
+        image-rendering: pixelated;
+        border-radius: 14px;
+        box-shadow: 0 14px 38px rgba(0,0,0,0.35);
+      }
+      .imgbox img.source {
+        image-rendering: auto;
+        opacity: 0.92;
+      }
+      .actions { display: flex; gap: 10px; margin-top: 10px; }
+      .actions > * { flex: 1; }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .tab {
+        flex: 1;
+        text-align: center;
+        padding: 9px 10px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.06);
+        color: var(--muted);
+        font-weight: 900;
+        cursor: pointer;
+      }
+      .tab.active {
+        background: linear-gradient(180deg, rgba(255,109,31,0.30), rgba(255,109,31,0.12));
+        border-color: rgba(255,109,31,0.38);
+        color: var(--text);
+      }
+      .panel { display: none; }
+      .panel.active { display: block; }
+      .sliderrow {
+        display: grid;
+        grid-template-columns: 1fr 90px;
+        gap: 10px;
+        align-items: center;
+      }
+      input[type="range"] { padding: 0; height: 38px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="title">TFT GIF Converter</div>
+        <div class="hint">
+          Upload an image or GIF and generate <span style="font-family:var(--mono)">image_points.h</span>.
+          This uses the DisplayKit backend (<span style="font-family:var(--mono)">/api/tftgif/convert</span>).
+        </div>
+
+        <label>Source (PNG/JPG/GIF/WebP)</label>
+        <input type="file" id="file" accept="image/*,.gif" />
+
+        <div class="tabs" role="tablist" aria-label="Converter tabs">
+          <button class="tab active" type="button" data-tab="source">Source</button>
+          <button class="tab" type="button" data-tab="conversion">Conversion</button>
+          <button class="tab" type="button" data-tab="output">Output</button>
+        </div>
+
+        <div class="panel active" data-panel="source">
+          <div class="row">
+            <div>
+              <label>Fit</label>
+              <select id="fitMode">
+                <option value="contain">contain</option>
+                <option value="cover">cover</option>
+                <option value="stretch">stretch</option>
+              </select>
+            </div>
+            <div>
+              <label>Invert</label>
+              <select id="invertMode">
+                <option value="auto">auto</option>
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Target W</label>
+              <input type="number" id="targetW" min="1" max="240" value="232" />
+            </div>
+            <div>
+              <label>Target H</label>
+              <input type="number" id="targetH" min="1" max="240" value="232" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Offset X</label>
+              <input type="number" id="offsetX" min="-240" max="240" value="4" />
+            </div>
+            <div>
+              <label>Offset Y</label>
+              <input type="number" id="offsetY" min="-240" max="240" value="4" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Frame start</label>
+              <input type="number" id="frameStart" min="0" max="10000" value="0" />
+            </div>
+            <div>
+              <label>Frame end (0=last)</label>
+              <input type="number" id="frameEnd" min="0" max="10000" value="0" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Frame skip</label>
+              <input type="number" id="frameSkip" min="1" max="60" value="1" />
+            </div>
+            <div>
+              <label>Max GIF frames</label>
+              <input type="number" id="maxFrames" min="1" max="300" value="60" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Preview scale</label>
+              <input type="number" id="previewScale" min="1" max="6" value="2" />
+            </div>
+            <div>
+              <label>Dither</label>
+              <select id="ditherMode">
+                <option value="none">none</option>
+                <option value="ordered">ordered</option>
+              </select>
+            </div>
+          </div>
+
+          <label>Preview frame scrub</label>
+          <div class="sliderrow">
+            <input type="range" id="frameScrub" min="0" max="0" value="0" />
+            <input type="number" id="previewFrame" min="0" max="999" value="0" />
+          </div>
+          <div class="hint" id="frameHint">Load a GIF to scrub frames.</div>
+        </div>
+
+        <div class="panel" data-panel="conversion">
+          <div class="row">
+            <div>
+              <label>Sample step</label>
+              <input type="number" id="sampleStep" min="1" max="8" value="2" />
+            </div>
+            <div>
+              <label>Ink threshold</label>
+              <input type="number" id="inkThreshold" min="0" max="255" value="34" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Max points/frame</label>
+              <input type="number" id="maxPoints" min="100" max="20000" value="4200" />
+            </div>
+            <div>
+              <label>Min frame ms</label>
+              <input type="number" id="minFrameMs" min="0" max="2000" value="60" />
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" data-panel="output">
+          <div class="actions">
+            <button id="convertBtn" type="button">Convert</button>
+            <button id="downloadBtn" class="secondary" type="button" disabled>Download .h</button>
+          </div>
+
+          <label>Generated header</label>
+          <textarea id="out" spellcheck="false" placeholder="Click Convert…"></textarea>
+        </div>
+      </div>
+
+      <div class="card preview">
+        <div class="preview-top">
+          <div class="pill" id="status">Waiting for input…</div>
+          <div class="pill" id="meta">—</div>
+        </div>
+        <div class="imgbox">
+          <img id="sourcePreview" class="source" alt="Source preview" style="display:none" />
+          <img id="preview" alt="Preview" style="display:none" />
+          <div id="empty" class="hint">Preview will appear here.</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const file = $("file");
+      const convertBtn = $("convertBtn");
+      const downloadBtn = $("downloadBtn");
+      const out = $("out");
+      const img = $("preview");
+      const srcImg = $("sourcePreview");
+      const empty = $("empty");
+      const status = $("status");
+      const meta = $("meta");
+      const tabs = Array.from(document.querySelectorAll(".tab"));
+      const panels = Array.from(document.querySelectorAll(".panel"));
+      const frameScrub = $("frameScrub");
+      const frameHint = $("frameHint");
+      let lastResult = null;
+      let autoTimer = null;
+
+      let lastObjectUrl = null;
+
+      async function checkApi() {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 1200);
+          const r = await fetch("/api/health", { signal: ctrl.signal, cache: "no-store" });
+          clearTimeout(t);
+          return r && r.ok;
+        } catch {
+          return false;
+        }
+      }
+
+      function showSourcePreview(fileObj) {
+        try {
+          if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl);
+        } catch (_) {}
+        lastObjectUrl = URL.createObjectURL(fileObj);
+        srcImg.src = lastObjectUrl;
+        srcImg.style.display = "block";
+        empty.style.display = "none";
+      }
+
+      function buildSettings() {
+        return {
+          fit_mode: $("fitMode").value,
+          invert_mode: $("invertMode").value,
+          target_w: parseInt($("targetW").value, 10) || 232,
+          target_h: parseInt($("targetH").value, 10) || 232,
+          offset_x: parseInt($("offsetX").value, 10) || 4,
+          offset_y: parseInt($("offsetY").value, 10) || 4,
+          sample_step: parseInt($("sampleStep").value, 10) || 2,
+          ink_threshold: parseInt($("inkThreshold").value, 10) || 34,
+          max_points_per_frame: parseInt($("maxPoints").value, 10) || 4200,
+          max_gif_frames: parseInt($("maxFrames").value, 10) || 60,
+          min_frame_ms: parseInt($("minFrameMs").value, 10) || 60,
+          frame_start: parseInt($("frameStart").value, 10) || 0,
+          frame_end: parseInt($("frameEnd").value, 10) || 0,
+          frame_skip: parseInt($("frameSkip").value, 10) || 1,
+          dither_mode: $("ditherMode").value,
+        };
+      }
+
+      function downloadText(filename, text) {
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      async function convert() {
+        if (!file.files || !file.files[0]) {
+          status.textContent = "Choose a file first.";
+          return;
+        }
+        const apiOk = await checkApi();
+        if (!apiOk) {
+          status.textContent = "Backend API is not running (preview-only mode).";
+          meta.textContent = "Start the DisplayKit server (FastAPI) to convert.";
+          return;
+        }
+        status.textContent = "Converting…";
+        meta.textContent = "—";
+        downloadBtn.disabled = true;
+        if (out) out.value = "";
+        img.style.display = "none";
+        // Keep the source preview visible while converting
+        empty.style.display = "block";
+
+        const fd = new FormData();
+        fd.append("file", file.files[0]);
+        fd.append("settings", JSON.stringify(buildSettings()));
+        const reqScale = (parseInt($("previewScale").value, 10) || 2);
+        const reqFrame = (parseInt($("previewFrame").value, 10) || 0);
+        fd.append("preview_scale", String(reqScale));
+        fd.append("preview_frame", String(reqFrame));
+
+        let res;
+        try {
+          res = await fetch("/api/tftgif/convert", { method: "POST", body: fd });
+        } catch (err) {
+          status.textContent = "Convert failed (network / server not running).";
+          if (out) out.value = String(err || "network_error");
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!data || !data.ok) {
+          status.textContent = "Convert failed.";
+          if (out) out.value = JSON.stringify(data, null, 2);
+          return;
+        }
+
+        lastResult = data;
+        status.textContent = "Ready";
+        const pf = data.points_per_frame || [];
+        const fi = data.preview_frame || 0;
+        const perFrame = (pf && pf.length) ? (` · frame ${fi + 1}/${data.frame_count}: ${pf[fi] || 0} pts`) : "";
+        meta.textContent = `${data.frame_count} frame(s) · ${data.point_count} points · ~${Math.round((data.estimated_point_bytes || 0)/1024)} KB${perFrame} · req:${reqFrame}→got:${fi}`;
+        if (out) out.value = data.header_text || "";
+        downloadBtn.disabled = !out.value;
+        const src = "data:image/png;base64," + data.preview_png_base64;
+        img.src = src;
+        img.style.display = "block";
+        // Hide source once we have converted preview (cleaner)
+        srcImg.style.display = "none";
+        empty.style.display = "none";
+
+        // Enable scrubbing
+        const max = Math.max(0, (data.frame_count || 1) - 1);
+        frameScrub.max = String(max);
+        frameScrub.value = String(fi);
+        $("previewFrame").max = String(max);
+        $("previewFrame").value = String(fi);
+        const fc = Number(data.frame_count || 1);
+        frameScrub.disabled = fc <= 1;
+        $("previewFrame").disabled = fc <= 1;
+        frameHint.textContent = fc > 1
+          ? `Scrub frames. Total source frames: ${data.total_source_frames || fc}`
+          : "Only 1 frame after your filters (frame range/skip/max frames). Increase Max GIF frames or reset Frame start/end/skip.";
+      }
+
+      convertBtn.addEventListener("click", () => convert());
+      downloadBtn.addEventListener("click", () => downloadText("image_points.h", out.value || ""));
+
+      // Tabs
+      tabs.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const key = btn.getAttribute("data-tab");
+          tabs.forEach((b) => b.classList.toggle("active", b === btn));
+          panels.forEach((p) => p.classList.toggle("active", p.getAttribute("data-panel") === key));
+        });
+      });
+
+      function scheduleAutoConvert(delayMs) {
+        if (!file.files || !file.files[0]) return;
+        if (autoTimer) clearTimeout(autoTimer);
+        status.textContent = "Updating preview…";
+        autoTimer = setTimeout(() => convert(), delayMs);
+      }
+
+      // Scrub: debounce and reconvert with different preview_frame (same file + settings)
+      function requestScrub(frameIdx) {
+        $("previewFrame").value = String(frameIdx);
+        frameScrub.value = String(frameIdx);
+        scheduleAutoConvert(120);
+      }
+      frameScrub.addEventListener("input", () => requestScrub(parseInt(frameScrub.value, 10) || 0));
+      $("previewFrame").addEventListener("input", () => requestScrub(parseInt($("previewFrame").value, 10) || 0));
+
+      // Auto-update preview when settings change (like the desktop studio feel)
+      const autoInputs = [
+        "fitMode","invertMode","targetW","targetH","offsetX","offsetY",
+        "frameStart","frameEnd","frameSkip","maxFrames",
+        "sampleStep","inkThreshold","maxPoints","minFrameMs","ditherMode","previewScale"
+      ].map($).filter(Boolean);
+      autoInputs.forEach((el) => {
+        el.addEventListener("input", () => scheduleAutoConvert(220));
+        el.addEventListener("change", () => scheduleAutoConvert(220));
+      });
+
+      file.addEventListener("change", async () => {
+        if (!file.files || !file.files[0]) return;
+        showSourcePreview(file.files[0]);
+        status.textContent = "Source loaded. Click Convert for point preview.";
+        meta.textContent = "—";
+        img.style.display = "none";
+        downloadBtn.disabled = true;
+        if (out) out.value = "";
+        const apiOk = await checkApi();
+        if (!apiOk) {
+          status.textContent = "Source loaded (backend not running).";
+          meta.textContent = "Start DisplayKit server to convert.";
+        }
+      });
+
+      // Embed theme sync from DisplayKit overlay
+      window.addEventListener("message", (e) => {
+        const msg = e && e.data ? e.data : null;
+        if (!msg || msg.type !== "displaykitTheme") return;
+        document.documentElement.dataset.theme = msg.theme;
+      });
+    </script>
+  </body>
+</html>
+

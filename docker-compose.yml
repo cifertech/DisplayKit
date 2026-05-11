@@ -1,0 +1,11 @@
+# Local production-style run. For real deploy, set DISPLAYKIT_TRUSTED_HOSTS to your domain(s).
+services:
+  displaykit:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DISPLAYKIT_ENV: production
+      DISPLAYKIT_APP_VERSION: "1.0.0"
+      # Optional: comma-separated Host header values (include port if your client sends it).
+      # DISPLAYKIT_TRUSTED_HOSTS: "localhost,127.0.0.1"

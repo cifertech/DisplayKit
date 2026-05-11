@@ -122,6 +122,33 @@ body::before {
   height: 100vh;
 }
 
+/* Figma-like grid layout (used when `.dk-grid` is present on app-shell) */
+.app-shell.dk-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr 360px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "left top right"
+    "left center right";
+}
+.dk-left { grid-area: left; }
+.dk-top { grid-area: top; }
+.dk-center { grid-area: center; }
+.dk-right { grid-area: right; }
+
+@media (max-width: 1100px) {
+  .app-shell.dk-grid {
+    grid-template-columns: 300px 1fr 320px;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell.dk-grid {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 [data-theme="dark"] .app-shell {
   background: var(--bg-secondary);
   border-color: var(--btn-primary);
@@ -632,8 +659,8 @@ a.btn {
   margin-right: 0;
   font-size: 13px;
   line-height: 1;
-  background: var(--btn-primary);
-  border: 1px solid var(--btn-primary);
+  background: linear-gradient(180deg, rgba(255,109,31,0.98), rgba(255,109,31,0.80));
+  border: 1px solid rgba(255, 109, 31, 0.65);
   color: white;
   flex-shrink: 0;
   transition: background-color 0.15s ease, border-color 0.15s ease,
@@ -642,6 +669,22 @@ a.btn {
 .icon-box svg {
   width: 18px;
   height: 18px;
+  overflow: visible;
+}
+.icon-box svg * {
+  vector-effect: non-scaling-stroke;
+}
+.icon-box svg path,
+.icon-box svg rect,
+.icon-box svg circle,
+.icon-box svg line,
+.icon-box svg polyline,
+.icon-box svg polygon {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .icon-box.shape,
 .icon-box.ui {
@@ -682,6 +725,11 @@ a.btn {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.prop-inline {
+  display: flex;
+  align-items: end;
 }
 
 @media (max-width: 420px) {
@@ -728,6 +776,8 @@ a.btn {
   width: 38px;
   height: 38px;
   border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,109,31,0.98), rgba(255,109,31,0.78));
+  border-color: rgba(255, 109, 31, 0.35);
   box-shadow:
     0 10px 20px rgba(0, 0, 0, 0.18),
     0 0 0 1px rgba(255, 109, 31, 0.10);
@@ -761,6 +811,11 @@ a.btn {
   overflow: hidden;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.08);
   height: 100%;
+}
+
+/* Old `.main` container no longer used when `.dk-grid` is active. */
+.app-shell.dk-grid > .main {
+  display: none;
 }
 .top-bar {
   padding: 14px 18px;
@@ -802,6 +857,51 @@ a.btn {
   font-size: 12px;
   color: var(--text-secondary);
 }
+
+.tool-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+}
+[data-theme="dark"] .tool-toggle {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Better tool button active state */
+.tool-toggle .btn[aria-pressed="true"] {
+  background: rgba(255, 109, 31, 0.14);
+  border-color: rgba(255, 109, 31, 0.35);
+  color: var(--text-primary);
+  box-shadow: 0 10px 22px rgba(255, 109, 31, 0.10);
+}
+
+/* Canvas cursor polish */
+.preview-wrapper.cursor-hand {
+  cursor: grab;
+}
+.preview-wrapper.cursor-hand.grabbing {
+  cursor: grabbing;
+}
+
+.zoom-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.zoom-inline input[type="number"] {
+  width: 72px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-weight: 700;
+}
 .workspace {
   display: flex;
   flex: 1;
@@ -816,17 +916,82 @@ a.btn {
   justify-content: center;
   position: relative;
   overflow: hidden;
+  /* Figma-like canvas */
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0) 0 0 / 18px 18px,
+    linear-gradient(var(--bg-primary), var(--bg-primary));
 }
 .preview-frame {
-  background: var(--bg-secondary);
-  padding: 16px;
-  border-radius: 24px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-  border: 2px solid var(--btn-primary);
+  /* Treat this like an artboard chrome, not a “card” */
+  background: transparent;
+  padding: 28px;
+  border-radius: 18px;
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   overflow: visible;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+[data-theme="light"] .preview-wrapper {
+  background:
+    radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0) 0 0 / 18px 18px,
+    linear-gradient(var(--bg-primary), var(--bg-primary));
+}
+[data-theme="light"] .preview-frame {
+  border-color: rgba(0, 0, 0, 0.10);
+}
+
+/* Rulers + guides (Figma-like) */
+.ruler-corner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.12);
+  border-top-left-radius: 12px;
+}
+.ruler-x, .ruler-y {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ruler-x {
+  left: 28px;
+  top: 0;
+  height: 28px;
+}
+.ruler-y {
+  left: 0;
+  top: 28px;
+  width: 28px;
+}
+.ruler-canvas {
+  display: block;
+}
+.guide-line {
+  position: absolute;
+  background: rgba(255, 0, 200, 0.65);
+  pointer-events: auto;
+  z-index: 56;
+}
+.guide-line.v { width: 1px; top: 0; bottom: 0; cursor: col-resize; }
+.guide-line.h { height: 1px; left: 0; right: 0; cursor: row-resize; }
+
+/* Viewport wrapper so pan/zoom can transform one element */
+.preview-viewport {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  transform-origin: 0 0;
 }
 #preview {
   position: relative;
@@ -835,6 +1000,10 @@ a.btn {
   width: 240px;
   height: 320px;
   image-rendering: auto;
+  border-radius: 10px;
+  box-shadow:
+    0 18px 48px rgba(0,0,0,0.28),
+    0 0 0 1px rgba(255,255,255,0.10);
 }
 
 #preview.oled-display {
@@ -909,7 +1078,7 @@ a.btn {
 }
 
 .ui-element:hover:not(.selected) {
-  transform: translateY(-1px) scale(1.02);
+  /* Avoid transform here — it fights inline rotation on elements */
   box-shadow: 0 4px 16px rgba(255, 109, 31, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1);
   border-color: rgba(255, 109, 31, 0.3);
   z-index: 5;
@@ -920,7 +1089,6 @@ a.btn {
   outline-offset: 2px;
   box-shadow: 0 0 0 1px var(--outline-color), 0 8px 24px rgba(255, 109, 31, 0.25), 0 4px 12px rgba(0, 0, 0, 0.15);
   border-color: var(--outline-color);
-  transform: scale(1.01);
   z-index: 20;
 }
 
@@ -1091,6 +1259,43 @@ a.btn {
 .resize-handle.s { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
 .resize-handle.e { right: -6px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
 .resize-handle.w { left: -6px; top: 50%; transform: translateY(-50%); cursor: w-resize; }
+
+.rotate-handle {
+  top: -22px;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%);
+  cursor: grab;
+  border-radius: 3px;
+}
+.rotate-handle:hover {
+  transform: translateX(-50%) scale(1.12);
+}
+
+.distance-hint {
+  position: absolute;
+  z-index: 100;
+  pointer-events: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #ff00cc;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 0, 204, 0.5);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.scrub-label {
+  cursor: ew-resize;
+  user-select: none;
+}
+.scrub-label:hover {
+  color: var(--accent, #ff6d1f);
+}
 .properties {
   --props-pad: 10px;
   flex: 0 0 320px;
@@ -1109,6 +1314,320 @@ a.btn {
     linear-gradient(var(--bg-secondary), rgba(0, 0, 0, 0)) 0 0 / 100% 16px local,
     linear-gradient(rgba(0, 0, 0, 0), var(--bg-secondary)) 0 100% / 100% 16px local,
     var(--bg-secondary);
+}
+
+.inspector-tabs {
+  display: flex;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 6px 6px 8px 6px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.02);
+  backdrop-filter: blur(10px);
+}
+[data-theme="dark"] .inspector-tabs {
+  background: rgba(255, 255, 255, 0.02);
+}
+.inspector-tab {
+  flex: 1;
+  border-radius: 14px;
+  padding: 10px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.inspector-tab[aria-selected="true"] {
+  color: var(--text-primary);
+  background: rgba(255, 109, 31, 0.10);
+  border-color: rgba(255, 109, 31, 0.25);
+}
+.inspector-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inspector-tab-panel[hidden] {
+  display: none !important;
+}
+
+/* Layers panel */
+.layers-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+/* Assets panel (project-local) */
+.assets-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+.assets-toolbar .toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.assets-toolbar .toggle-row input {
+  accent-color: var(--btn-primary);
+}
+.assets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.asset-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+[data-theme="dark"] .asset-row {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+[data-theme="light"] .asset-row {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+.asset-row:hover {
+  border-color: rgba(255, 109, 31, 0.35);
+  box-shadow: 0 6px 16px rgba(255, 109, 31, 0.08);
+}
+.asset-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255,255,255,0.10);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+[data-theme="light"] .asset-thumb {
+  border-color: rgba(0,0,0,0.10);
+  background: rgba(0,0,0,0.06);
+}
+.asset-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+}
+.asset-main {
+  min-width: 0;
+  flex: 1;
+}
+.asset-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.asset-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.asset-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.asset-actions .btn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 10px;
+}
+.layer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  user-select: none;
+}
+[data-theme="dark"] .layer-row {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.layer-row:hover {
+  border-color: rgba(255, 109, 31, 0.35);
+  box-shadow: 0 6px 16px rgba(255, 109, 31, 0.08);
+}
+.layer-row.selected {
+  outline: 2px solid var(--outline-color);
+}
+.layer-row .layer-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.layer-row .layer-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.layer-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.layer-action-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+[data-theme="dark"] .layer-action-btn {
+  background: rgba(255, 255, 255, 0.03);
+}
+.layer-action-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 109, 31, 0.35);
+}
+.layer-action-btn.active {
+  color: var(--btn-primary);
+  border-color: rgba(255, 109, 31, 0.35);
+  background: rgba(255, 109, 31, 0.10);
+}
+
+/* Marquee selection box */
+.marquee-box {
+  position: absolute;
+  border: 1px solid rgba(255, 109, 31, 0.9);
+  background: rgba(255, 109, 31, 0.10);
+  box-shadow: 0 0 0 1px rgba(255, 109, 31, 0.25) inset;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* Multi-selection bounds (Figma-ish) */
+.selection-bounds {
+  position: absolute;
+  border: 1px solid rgba(255, 109, 31, 0.95);
+  box-shadow: 0 0 0 1px rgba(255, 109, 31, 0.22) inset;
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 58;
+}
+
+/* SVG overlay for paths/shapes */
+.path-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 12;
+}
+
+/* Snap guides */
+.snap-guide {
+  position: absolute;
+  background: rgba(255, 0, 200, 0.9);
+  pointer-events: none;
+  z-index: 55;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+}
+.snap-guide.show {
+  opacity: 1;
+}
+.snap-guide.v { width: 1px; top: 0; bottom: 0; }
+.snap-guide.h { height: 1px; left: 0; right: 0; }
+
+/* Inline text editor overlay */
+.inline-text-editor {
+  box-sizing: border-box;
+}
+
+/* Context menu */
+.context-menu {
+  position: fixed;
+  min-width: 180px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: rgba(20, 20, 20, 0.92);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+  z-index: 9999;
+  display: none;
+}
+[data-theme="light"] .context-menu {
+  background: rgba(255, 255, 255, 0.92);
+}
+.context-menu.open { display: block; }
+.context-item {
+  width: 100%;
+  text-align: left;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+.context-item:hover {
+  background: rgba(255, 109, 31, 0.12);
+  border-color: rgba(255, 109, 31, 0.25);
+}
+.context-sep {
+  height: 1px;
+  margin: 6px 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+[data-theme="light"] .context-sep {
+  background: rgba(0, 0, 0, 0.08);
 }
 
 /* Sticky "Selected Element" header inside the properties sidebar */
@@ -1320,20 +1839,23 @@ a.btn {
   margin-bottom: 4px;
 }
 .code-panel {
-  height: 32%;
   border-top: 1px solid var(--border-color);
   padding: 8px;
   background: var(--bg-secondary);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  /* In the inspector tab, make it feel like a real editor panel */
+  height: calc(100vh - 220px);
+  min-height: 360px;
 }
 #codeOutput {
   flex: 1;
-  resize: vertical;
+  resize: none;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.35;
   background: var(--input-bg);
   color: var(--text-primary);
   border-radius: 8px;

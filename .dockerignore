@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+*.py[cod]
+*$py.class
+.cursor
+.vscode
+.github
+scripts
+*.md
+LICENSE
+Dockerfile
+docker-compose.yml
+.dockerignore
