@@ -1,24 +1,28 @@
+
+
 <div align="center">
 
-<!-- Badges -->
+  <img src="https://github.com/user-attachments/assets/271142ed-d5c8-4860-a16e-c6b718a1d2a5" alt="DisplayKit Banner" width="100%"/>
 
-<a href="https://github.com/cifertech/DisplayKit" title="Go to GitHub repo"><img src="https://img.shields.io/static/v1?label=cifertech&message=DisplayKit&color=cyan&logo=github" alt="cifertech - DisplayKit"></a>
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/cifertech/DisplayKit/total)
-<a href="https://github.com/cifertech/DisplayKit"><img src="https://img.shields.io/github/stars/cifertech/DisplayKit?style=social" alt="stars - DisplayKit"></a>
-<a href="https://github.com/cifertech/DisplayKit"><img src="https://img.shields.io/github/forks/cifertech/DisplayKit?style=social" alt="forks - DisplayKit"></a>
-   
-<h4>
-    <a href="https://twitter.com/techcifer">TWITTER</a>
-  <span> · </span>
-    <a href="https://www.instagram.com/cifertech/">INSTAGRAM</a>
-  <span> · </span>
-    <a href="https://www.youtube.com/c/techcifer">YOUTUBE</a>
-  <span> · </span>
-    <a href="https://cifertech.net/">WEBSITE</a>
-  </h4>
-</div> 
- 
-<br />
+  <br/>
+  <br/>
+
+  <p align="center">
+    <a href="https://github.com/cifertech/DisplayKit"><img src="https://img.shields.io/static/v1?label=cifertech&message=DisplayKit&color=orange&logo=github"/></a>
+    <a href="https://github.com/cifertech/DisplayKit"><img src="https://img.shields.io/github/stars/cifertech/DisplayKit?style=social"/></a>
+    <a href="https://github.com/cifertech/DisplayKit"><img src="https://img.shields.io/github/forks/cifertech/DisplayKit?style=social"/></a>
+    <img src="https://img.shields.io/github/downloads/cifertech/DisplayKit/total?color=orange&label=downloads&logo=github"/>
+    <img src="https://img.shields.io/badge/license-MIT-orange"/>
+  </p>
+
+  <p align="center">
+    <a href="https://twitter.com/techcifer"><img src="https://img.shields.io/badge/Twitter-orange?logo=x&logoColor=black"/></a>
+    <a href="https://www.instagram.com/cifertech/"><img src="https://img.shields.io/badge/Instagram-orange?logo=instagram&logoColor=black"/></a>
+    <a href="https://www.youtube.com/c/techcifer"><img src="https://img.shields.io/badge/YouTube-orange?logo=youtube&logoColor=black"/></a>
+    <a href="https://cifertech.net/"><img src="https://img.shields.io/badge/Website-orange?logo=googlechrome&logoColor=black"/></a>
+  </p>
+
+</div>
 
 # 🎨 DisplayKit
 
@@ -29,6 +33,8 @@ Design screens visually → generate clean **Arduino** drawing code → run it o
 ## Quick start
 
 - **Use it online**: click the GitHub Pages link in the repository, or open: `https://cifertech.github.io/DisplayKit/`
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/83010cdd-fe2c-4521-807a-3e5affd62e51" />
 
 
 ## How to use
