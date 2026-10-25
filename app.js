@@ -3607,17 +3607,57 @@ function drawOledBitmapText5x7(ctx, text, x, y, w, h, color, scale = 1) {
   }
 }
 
-function drawOledThresholdedText(ctx, text, x, y, w, h, textSize, color) {
-  const ts = Number(textSize || 1);
-  // For size 1, use a real bitmap font so it looks correct (no browser anti-alias artifacts).
-  if (ts <= 1.05) {
-    drawOledBitmapText5x7(ctx, text, x, y, w, h, color, 1);
-    return;
+function getOledPreviewFontStyle(fontName, textSize) {
+  const name = String(fontName || DEFAULT_U8G2_FONT).toLowerCase();
+  const ts = Math.max(0.75, Math.min(3, Number(textSize || 1)));
+
+  // U8g2 font names usually encode their approximate height (e.g. 6x12,
+  // helvR12, profont15, logisoso30). Use that to approximate the selected
+  // bitmap font in the browser preview. This is not a pixel-perfect U8g2
+  // font rasterizer, but unlike the old preview it responds to font choice.
+  let px = 8;
+  const xy = name.match(/(?:^|_)(\d{1,2})x(\d{1,2})(?:_|$)/);
+  const namedSize = name.match(/(?:helv[rb]|ncen[rb]|tim[rb]|cour[rb]|lub[rb]|profont|t0_)(\d{1,2})/);
+  const logoSize = name.match(/logisoso(\d{1,2})/);
+  const inSize = name.match(/in[rb](\d{1,2})/);
+  if (xy) px = Number(xy[2]);
+  else if (logoSize) px = Number(logoSize[1]);
+  else if (namedSize) px = Number(namedSize[1]);
+  else if (inSize) px = Number(inSize[1]);
+  else if (name.includes("micro")) px = 6;
+  else if (name.includes("unifont")) px = 16;
+  else if (name.includes("emoticons21")) px = 21;
+  else if (name.includes("battery19")) px = 19;
+  else if (name.includes("open_iconic_all_")) {
+    const m = name.match(/open_iconic_all_(\d)x/);
+    if (m) px = Number(m[1]) * 8;
   }
+  px = Math.max(5, Math.min(64, Math.round(px * ts)));
+
+  let family = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace';
+  let weight = "500";
+  if (name.includes("helv") || name.includes("lub") || name.includes("saikyosans") || name.includes("torussans")) {
+    family = 'Arial, "Helvetica Neue", sans-serif';
+  } else if (name.includes("ncen") || name.includes("tim")) {
+    family = 'Georgia, "Times New Roman", serif';
+  } else if (name.includes("logisoso") || name.includes("inb") || name.includes("bold") || /(?:[bn])_/.test(name)) {
+    family = 'Arial, "Helvetica Neue", sans-serif';
+    weight = "700";
+  }
+  if (name.includes("profont") || name.includes("t0_") || name.includes("cour")) {
+    family = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+  }
+  if (name.includes("b08") || name.includes("b10") || name.includes("b12") || name.includes("b14") ||
+      name.includes("b18") || name.includes("b24") || name.includes("bold")) weight = "700";
+  return { px, family, weight };
+}
+
+function drawOledThresholdedText(ctx, text, x, y, w, h, textSize, color, fontName) {
   const W = Math.max(1, Math.min(dispWidth, Math.floor(w)));
   const H = Math.max(1, Math.min(dispHeight, Math.floor(h)));
   if (!_oledTextCtx) return;
 
+  const font = getOledPreviewFontStyle(fontName, textSize);
   _oledTextCanvas.width = W;
   _oledTextCanvas.height = H;
   _oledTextCtx.clearRect(0, 0, W, H);
@@ -3625,11 +3665,10 @@ function drawOledThresholdedText(ctx, text, x, y, w, h, textSize, color) {
   _oledTextCtx.fillStyle = "#ffffff";
   _oledTextCtx.textBaseline = "top";
   _oledTextCtx.textAlign = "left";
-  const px = Math.max(6, Math.floor(8 * (Number(textSize || 1))));
-  _oledTextCtx.font = `${px}px ui-monospace, Menlo, Consolas, monospace`;
+  _oledTextCtx.font = `${font.weight} ${font.px}px ${font.family}`;
 
   const lines = String(text || "").split(/\r?\n/);
-  const lh = Math.max(1, Math.floor(px + 1));
+  const lh = Math.max(1, Math.floor(font.px + 1));
   lines.forEach((line, idx) => _oledTextCtx.fillText(line, 0, idx * lh));
 
   const data = _oledTextCtx.getImageData(0, 0, W, H).data;
@@ -3641,7 +3680,6 @@ function drawOledThresholdedText(ctx, text, x, y, w, h, textSize, color) {
     }
   }
 }
-
 function drawOledThresholdedImage(ctx, src, x, y, w, h, color) {
   const img = getCachedOledImage(src);
   if (!img || !img.complete || !img.naturalWidth) return;
@@ -3818,7 +3856,8 @@ function renderElements() {
                 Math.max(1, w - pad * 2),
                 Math.max(1, h - pad * 2),
                 el.textSize || 1,
-                textColor
+                textColor,
+                el.font || el.u8g2Font || DEFAULT_U8G2_FONT
               );
             }
           } catch (_) {
